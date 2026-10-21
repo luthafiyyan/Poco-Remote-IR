@@ -1,0 +1,6 @@
+{
+  "name": "Poco IR Remote - Samsung Smart TV Hybrid Controller",
+  "description": "Modern Glassmorphism Web-based Samsung Smart TV remote with NECx2 IR Blaster bridge for Poco X7 Pro and Android WebView.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

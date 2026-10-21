@@ -1,0 +1,1363 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Poco IR Remote - Samsung Smart TV</title>
+  <style>
+    /* ============================================================
+       Modern Glassmorphism Theme - Poco X7 Pro (20:9 Aspect Ratio)
+       ============================================================ */
+    :root {
+      --bg-primary: #07090e;
+      --glass-panel: rgba(18, 24, 38, 0.72);
+      --glass-border: rgba(255, 255, 255, 0.12);
+      --glass-highlight: rgba(255, 255, 255, 0.08);
+      --glass-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+      
+      --btn-bg: rgba(255, 255, 255, 0.06);
+      --btn-border: rgba(255, 255, 255, 0.10);
+      --btn-hover: rgba(255, 255, 255, 0.12);
+      
+      --accent-red: #ff3b30;
+      --accent-red-glow: rgba(255, 59, 48, 0.45);
+      
+      --accent-blue: #0a84ff;
+      --accent-blue-glow: rgba(10, 132, 255, 0.5);
+      
+      --accent-yt: #ff0000;
+      --accent-yt-glow: rgba(255, 0, 0, 0.4);
+
+      --text-main: #f5f5f7;
+      --text-muted: #8e8e93;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: radial-gradient(circle at 50% 8%, #1a233a 0%, #0c101a 55%, #05070a 100%);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow-x: hidden;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    }
+
+    /* Container Khusus Layar Vertikal Smartphone Poco X7 Pro */
+    .remote-container {
+      width: 100%;
+      max-width: 420px;
+      min-height: 100vh;
+      padding: 12px 14px 18px 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+    }
+
+    @media (min-height: 800px) {
+      .remote-container {
+        height: 100vh;
+        max-height: 930px;
+      }
+    }
+
+    /* Top Bar: Brand, Hardware Status, IR LED Indicator */
+    .header-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-radius: 16px;
+      margin-bottom: 10px;
+    }
+
+    .brand-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .brand-title {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      color: #ffffff;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .brand-sub {
+      font-size: 10px;
+      color: var(--text-muted);
+      letter-spacing: 0.3px;
+    }
+
+    .ir-emitter-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .ir-bulb {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #3a3d45;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      transition: all 0.15s ease;
+      position: relative;
+    }
+
+    .ir-bulb.transmitting {
+      background: #ff2d55;
+      box-shadow: 0 0 16px #ff2d55, 0 0 28px #ff3b30;
+      border-color: #ffffff;
+      transform: scale(1.2);
+    }
+
+    .status-badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+
+    .status-dot.online {
+      background: #30d158;
+      box-shadow: 0 0 8px #30d158;
+    }
+
+    .status-dot.simulated {
+      background: #ff9f0a;
+      box-shadow: 0 0 8px #ff9f0a;
+    }
+
+    /* Main Glass Remote Body */
+    .remote-body {
+      flex: 1;
+      background: var(--glass-panel);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+      border-radius: 32px;
+      box-shadow: var(--glass-shadow);
+      padding: 14px 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    /* Button base styles with tactile micro-interactions */
+    .btn {
+      background: var(--btn-bg);
+      border: 1px solid var(--btn-border);
+      color: var(--text-main);
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-weight: 600;
+      transition: transform 0.12s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.12s, box-shadow 0.12s, border-color 0.12s;
+      outline: none;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn:active {
+      transform: scale(0.93);
+      box-shadow: 0 0 14px rgba(255, 255, 255, 0.2);
+      border-color: rgba(255, 255, 255, 0.35);
+    }
+
+    /* Top Action Bar (Power, 123 Numpad, QWERTY Keyboard, Source) */
+    .top-action-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      align-items: center;
+    }
+
+    .btn-power {
+      background: rgba(255, 59, 48, 0.14);
+      border-color: rgba(255, 59, 48, 0.38);
+      color: var(--accent-red);
+      height: 48px;
+      border-radius: 16px;
+    }
+
+    .btn-power:active {
+      background: rgba(255, 59, 48, 0.3);
+      border-color: var(--accent-red);
+      box-shadow: 0 0 20px var(--accent-red-glow);
+    }
+
+    .btn-qwerty-toggle {
+      height: 48px;
+      border-radius: 16px;
+      font-size: 10px;
+      gap: 2px;
+      background: rgba(255, 0, 0, 0.1);
+      border-color: rgba(255, 50, 50, 0.3);
+      color: #ff6b6b;
+    }
+
+    .btn-qwerty-toggle:active {
+      background: rgba(255, 0, 0, 0.25);
+      border-color: #ff3b30;
+      box-shadow: 0 0 18px var(--accent-yt-glow);
+    }
+
+    .btn-top-aux {
+      height: 48px;
+      border-radius: 16px;
+      font-size: 10px;
+      gap: 2px;
+    }
+
+    /* YouTube Playback Control Strip */
+    .yt-playback-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      background: rgba(0, 0, 0, 0.25);
+      padding: 4px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .btn-media {
+      height: 36px;
+      border-radius: 10px;
+      font-size: 9px;
+      gap: 1px;
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.06);
+    }
+
+    .btn-media:active {
+      background: rgba(255, 255, 255, 0.15);
+      color: #64d2ff;
+    }
+
+    /* Circular D-Pad Controller */
+    .dpad-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 2px 0;
+    }
+
+    .dpad-outer {
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+
+    .dpad-dir {
+      position: absolute;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      color: var(--text-main);
+      cursor: pointer;
+      transition: all 0.12s ease;
+      z-index: 2;
+    }
+
+    .dpad-dir:active {
+      transform: scale(0.88);
+      color: #64d2ff;
+    }
+
+    .dpad-up {
+      top: 5px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 60px;
+      height: 48px;
+    }
+
+    .dpad-down {
+      bottom: 5px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 60px;
+      height: 48px;
+    }
+
+    .dpad-left {
+      left: 5px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 48px;
+      height: 60px;
+    }
+
+    .dpad-right {
+      right: 5px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 48px;
+      height: 60px;
+    }
+
+    .dpad-center-ok {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, rgba(10, 132, 255, 0.28) 0%, rgba(10, 132, 255, 0.08) 100%);
+      border: 1.5px solid rgba(10, 132, 255, 0.45);
+      color: #ffffff;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+      z-index: 3;
+      transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+    }
+
+    .dpad-center-ok:active {
+      transform: scale(0.92);
+      border-color: #64d2ff;
+      box-shadow: 0 0 24px var(--accent-blue-glow);
+    }
+
+    /* Navigation Row (Back, Home, Menu, Exit) */
+    .nav-pill-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 7px;
+    }
+
+    .btn-nav {
+      height: 46px;
+      border-radius: 14px;
+      font-size: 9.5px;
+      gap: 2px;
+    }
+
+    .btn-nav svg {
+      width: 16px;
+      height: 16px;
+      opacity: 0.9;
+    }
+
+    .btn-home {
+      border-color: rgba(100, 210, 255, 0.25);
+    }
+
+    /* Rocker Controls (Volume, Mute, Channel) */
+    .rockers-row {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr 1.1fr;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .rocker-pill {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--glass-border);
+      border-radius: 26px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      height: 112px;
+      padding: 5px;
+      box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4);
+    }
+
+    .rocker-btn {
+      width: 100%;
+      height: 40px;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.12s ease;
+    }
+
+    .rocker-btn:active {
+      transform: scale(0.92);
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .rocker-label {
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .center-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-mute {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      border-color: rgba(255, 255, 255, 0.15);
+      font-size: 9px;
+      gap: 2px;
+    }
+
+    .btn-mute:active {
+      border-color: #ff9f0a;
+      box-shadow: 0 0 16px rgba(255, 159, 10, 0.4);
+    }
+
+    .btn-info-pill {
+      font-size: 9px;
+      padding: 4px 8px;
+      border-radius: 10px;
+      color: var(--text-muted);
+    }
+
+    /* ============================================================
+       QWERTY KEYBOARD DRAWER (BOTTOM SHEET) UNTUK YOUTUBE
+       ============================================================ */
+    .keyboard-drawer {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(12, 16, 26, 0.98);
+      border-top: 1px solid var(--glass-border);
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      border-radius: 28px 28px 0 0;
+      padding: 12px 14px 22px 14px;
+      box-shadow: 0 -12px 36px rgba(0, 0, 0, 0.75);
+      transform: translateY(105%);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 100;
+    }
+
+    .keyboard-drawer.open {
+      transform: translateY(0);
+    }
+
+    .drawer-handle {
+      width: 42px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.25);
+      border-radius: 2px;
+      margin: 0 auto 10px auto;
+      cursor: pointer;
+    }
+
+    .drawer-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .drawer-header-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      color: #ff4d4d;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .drawer-btn-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 12px;
+      cursor: pointer;
+      padding: 4px 6px;
+    }
+
+    /* Input Box for typing fast with phone keyboard */
+    .yt-search-box-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .yt-search-input {
+      flex: 1;
+      height: 38px;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      padding: 0 12px;
+      font-size: 13px;
+      color: #ffffff;
+      outline: none;
+      user-select: text !important;
+      -webkit-user-select: text !important;
+    }
+
+    .yt-search-input:focus {
+      border-color: #ff3b30;
+      box-shadow: 0 0 12px rgba(255, 59, 48, 0.3);
+    }
+
+    .btn-yt-search-action {
+      background: #ff3b30;
+      color: #ffffff;
+      border: none;
+      border-radius: 12px;
+      padding: 0 12px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn-yt-search-action:active {
+      transform: scale(0.95);
+      background: #e0281e;
+    }
+
+    /* QWERTY Keys Grid */
+    .qwerty-row {
+      display: flex;
+      justify-content: center;
+      gap: 4px;
+      margin-bottom: 6px;
+    }
+
+    .key-btn {
+      height: 38px;
+      min-width: 30px;
+      flex: 1;
+      max-width: 36px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.1s ease;
+    }
+
+    .key-btn:active {
+      transform: scale(0.9);
+      background: rgba(255, 255, 255, 0.25);
+      border-color: #64d2ff;
+    }
+
+    .key-special {
+      flex: 1.4;
+      max-width: 52px;
+      font-size: 11px;
+      font-weight: 600;
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .key-space {
+      flex: 3.5;
+      max-width: 140px;
+      font-size: 11px;
+      letter-spacing: 0.5px;
+    }
+
+    .key-enter {
+      flex: 2;
+      max-width: 70px;
+      background: rgba(10, 132, 255, 0.25);
+      border-color: rgba(10, 132, 255, 0.4);
+      color: #64d2ff;
+      font-size: 11px;
+    }
+
+    /* Quick Preset Chips for YouTube */
+    .yt-quick-presets {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+      margin-top: 8px;
+    }
+
+    .chip-btn {
+      padding: 4px 10px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 10px;
+      color: var(--text-muted);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .chip-btn:active {
+      background: rgba(255, 59, 48, 0.2);
+      color: #ff6b6b;
+      border-color: rgba(255, 59, 48, 0.4);
+    }
+
+    /* Bottom Sheet Numpad (Angka 0-9) */
+    .numpad-drawer {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(12, 16, 26, 0.98);
+      border-top: 1px solid var(--glass-border);
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      border-radius: 28px 28px 0 0;
+      padding: 12px 18px 22px 18px;
+      box-shadow: 0 -12px 36px rgba(0, 0, 0, 0.75);
+      transform: translateY(105%);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 100;
+    }
+
+    .numpad-drawer.open {
+      transform: translateY(0);
+    }
+
+    .numpad-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .btn-num {
+      height: 48px;
+      border-radius: 16px;
+      font-size: 18px;
+      font-weight: 600;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    /* Collapsible Debug Console */
+    .debug-toggle-bar {
+      margin-top: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 10px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .debug-label {
+      font-size: 9px;
+      color: var(--text-muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    .btn-debug-toggle {
+      background: none;
+      border: none;
+      color: #64d2ff;
+      font-size: 9.5px;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
+    .debug-panel {
+      display: none;
+      margin-top: 4px;
+      background: rgba(5, 7, 12, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      padding: 6px 8px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 9px;
+      color: #70d7ff;
+      max-height: 80px;
+      overflow-y: auto;
+      line-height: 1.4;
+      word-break: break-all;
+    }
+
+    .debug-panel.show {
+      display: block;
+    }
+
+    /* Toast Notification */
+    .toast-msg {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-20px);
+      opacity: 0;
+      pointer-events: none;
+      background: rgba(20, 25, 38, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #ffffff;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+      transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 999;
+      white-space: nowrap;
+    }
+
+    .toast-msg.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Toast Notifikasi -->
+  <div id="toast" class="toast-msg">IR Transmitted</div>
+
+  <div class="remote-container">
+    
+    <!-- Header: Status Hardware Poco X7 Pro & Bridge IR -->
+    <div class="header-bar">
+      <div class="brand-info">
+        <span class="brand-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
+            <polyline points="17 2 12 7 7 2"></polyline>
+          </svg>
+          SAMSUNG SMART TV
+        </span>
+        <span class="brand-sub">Poco X7 Pro · IR Blaster (38 kHz)</span>
+      </div>
+
+      <div class="ir-emitter-indicator">
+        <div id="irBulb" class="ir-bulb" title="Sensor Pemancar IR LED"></div>
+        <div id="bridgeStatusBadge" class="status-badge">
+          <span id="bridgeStatusDot" class="status-dot simulated"></span>
+          <span id="bridgeStatusText">Memeriksa...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Badan Remote Glassmorphic -->
+    <div class="remote-body">
+      
+      <!-- Baris 1: Power, Numpad 123, Keyboard QWERTY, Source -->
+      <div class="top-action-grid">
+        <button class="btn btn-power" id="btnPower" data-hex="0xE0E040BF" data-name="Power">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+            <line x1="12" y1="2" x2="12" y2="12"></line>
+          </svg>
+          <span style="font-size: 8.5px; margin-top: 2px;">POWER</span>
+        </button>
+
+        <button class="btn btn-top-aux" id="btnNumpadOpen">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="5" height="5" rx="1"></rect>
+            <rect x="10" y="3" width="5" height="5" rx="1"></rect>
+            <rect x="17" y="3" width="5" height="5" rx="1"></rect>
+            <rect x="3" y="10" width="5" height="5" rx="1"></rect>
+            <rect x="10" y="10" width="5" height="5" rx="1"></rect>
+            <rect x="17" y="10" width="5" height="5" rx="1"></rect>
+          </svg>
+          <span>123</span>
+        </button>
+
+        <!-- QWERTY Keyboard Button untuk YouTube -->
+        <button class="btn btn-qwerty-toggle" id="btnQwertyOpen">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
+            <line x1="6" y1="8" x2="6.01" y2="8"></line>
+            <line x1="10" y1="8" x2="10.01" y2="8"></line>
+            <line x1="14" y1="8" x2="14.01" y2="8"></line>
+            <line x1="18" y1="8" x2="18.01" y2="8"></line>
+            <line x1="6" y1="12" x2="6.01" y2="12"></line>
+            <line x1="10" y1="12" x2="10.01" y2="12"></line>
+            <line x1="14" y1="12" x2="14.01" y2="12"></line>
+            <line x1="18" y1="12" x2="18.01" y2="12"></line>
+            <line x1="8" y1="16" x2="16" y2="16"></line>
+          </svg>
+          <span>QWERTY</span>
+        </button>
+
+        <button class="btn btn-top-aux" id="btnSource" data-hex="0xE0E0807F" data-name="Source">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+            <polyline points="22,6 12,13 2,6"></polyline>
+          </svg>
+          <span>SOURCE</span>
+        </button>
+      </div>
+
+      <!-- Strip Tombol Kontrol YouTube Media (Rewind, Play, Pause, Fast-Forward) -->
+      <div class="yt-playback-strip">
+        <button class="btn btn-media" data-hex="0xE0E0A25D" data-name="Rewind (10s)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="11 19 2 12 11 5 11 19"></polygon>
+            <polygon points="22 19 13 12 22 5 22 19"></polygon>
+          </svg>
+          <span>REW</span>
+        </button>
+
+        <button class="btn btn-media" data-hex="0xE0E0E21D" data-name="Play">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </svg>
+          <span>PLAY</span>
+        </button>
+
+        <button class="btn btn-media" data-hex="0xE0E052AD" data-name="Pause">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="6" y="4" width="4" height="16"></rect>
+            <rect x="14" y="4" width="4" height="16"></rect>
+          </svg>
+          <span>PAUSE</span>
+        </button>
+
+        <button class="btn btn-media" data-hex="0xE0E012ED" data-name="Fast-Forward (10s)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="13 19 22 12 13 5 13 19"></polygon>
+            <polygon points="2 19 11 12 2 5 2 19"></polygon>
+          </svg>
+          <span>FWD</span>
+        </button>
+      </div>
+
+      <!-- Baris 2: Navigasi D-Pad Melingkar -->
+      <div class="dpad-container">
+        <div class="dpad-outer">
+          <!-- Up -->
+          <button class="dpad-dir dpad-up" id="btnUp" data-hex="0xE0E006F9" data-name="Up" aria-label="Up">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="18 15 12 9 6 15"></polyline>
+            </svg>
+          </button>
+
+          <!-- Left -->
+          <button class="dpad-dir dpad-left" id="btnLeft" data-hex="0xE0E0A659" data-name="Left" aria-label="Left">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+          </button>
+
+          <!-- Center OK (Aksen Biru Glow) -->
+          <button class="dpad-center-ok" id="btnOk" data-hex="0xE0E016E9" data-name="OK / Enter" aria-label="OK">
+            <span>OK</span>
+          </button>
+
+          <!-- Right -->
+          <button class="dpad-dir dpad-right" id="btnRight" data-hex="0xE0E046B9" data-name="Right" aria-label="Right">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </button>
+
+          <!-- Down -->
+          <button class="dpad-dir dpad-down" id="btnDown" data-hex="0xE0E08679" data-name="Down" aria-label="Down">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Baris 3: Navigasi Bawah (Back, Home, Menu, Exit) -->
+      <div class="nav-pill-row">
+        <button class="btn btn-nav" id="btnBack" data-hex="0xE0E01AE5" data-name="Back / Return">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 14 4 9 9 4"></polyline>
+            <path d="M20 20v-7a4 4 0 0 0-4-4H4"></path>
+          </svg>
+          <span>BACK</span>
+        </button>
+
+        <button class="btn btn-nav btn-home" id="btnHome" data-hex="0xE0E09E61" data-name="Home (Smart Hub)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+          </svg>
+          <span>HOME</span>
+        </button>
+
+        <button class="btn btn-nav" id="btnMenu" data-hex="0xE0E058A7" data-name="Menu / Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+          <span>MENU</span>
+        </button>
+
+        <button class="btn btn-nav" id="btnExit" data-hex="0xE0E0B44B" data-name="Exit">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+          <span>EXIT</span>
+        </button>
+      </div>
+
+      <!-- Baris 4: Rocker Volume, Mute di Tengah, Channel -->
+      <div class="rockers-row">
+        <!-- Volume Rocker -->
+        <div class="rocker-pill">
+          <button class="rocker-btn" id="btnVolUp" data-hex="0xE0E0E01F" data-name="Volume Up" aria-label="Volume Up">
+            +
+          </button>
+          <span class="rocker-label">VOL</span>
+          <button class="rocker-btn" id="btnVolDown" data-hex="0xE0E0D02F" data-name="Volume Down" aria-label="Volume Down">
+            −
+          </button>
+        </div>
+
+        <!-- Tombol Mute di Tengah -->
+        <div class="center-actions">
+          <button class="btn btn-mute" id="btnMute" data-hex="0xE0E0F00F" data-name="Mute">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+              <line x1="23" y1="9" x2="17" y2="15"></line>
+              <line x1="17" y1="9" x2="23" y2="15"></line>
+            </svg>
+            <span>MUTE</span>
+          </button>
+          <span class="btn-info-pill">38 kHz</span>
+        </div>
+
+        <!-- Channel Rocker -->
+        <div class="rocker-pill">
+          <button class="rocker-btn" id="btnChUp" data-hex="0xE0E048B7" data-name="Channel Up" aria-label="Channel Up">
+            ∧
+          </button>
+          <span class="rocker-label">CH</span>
+          <button class="rocker-btn" id="btnChDown" data-hex="0xE0E008F7" data-name="Channel Down" aria-label="Channel Down">
+            ∨
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Status Log Ringkas & Tombol Toggle Log -->
+    <div class="debug-toggle-bar">
+      <span class="debug-label" id="lastTxSummary">Siap · Standby</span>
+      <button class="btn-debug-toggle" id="btnToggleDebug">Logs</button>
+    </div>
+    <div class="debug-panel" id="debugConsole">
+      [READY] IR Remote Samsung (NECx2 38kHz) siap digunakan.
+    </div>
+
+    <!-- ============================================================
+         DRAWER 1: QWERTY KEYBOARD KHUSUS YOUTUBE
+         ============================================================ -->
+    <div class="keyboard-drawer" id="qwertyDrawer">
+      <div class="drawer-handle" id="qwertyHandle"></div>
+      
+      <div class="drawer-header">
+        <span class="drawer-header-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+          </svg>
+          Pencarian YouTube TV
+        </span>
+        <button class="drawer-btn-close" id="btnQwertyClose">Tutup ✕</button>
+      </div>
+
+      <!-- Input Cepat dengan Keyboard HP -->
+      <div class="yt-search-box-row">
+        <input 
+          type="text" 
+          id="ytInput" 
+          class="yt-search-input" 
+          placeholder="Ketik judul video atau artis..."
+          autocomplete="off"
+        />
+        <button class="btn-yt-search-action" id="btnAutoTypeYt" title="Navigasi otomatis dan pilih karakter di YouTube">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          CARI
+        </button>
+      </div>
+
+      <!-- Tombol-tombol QWERTY -->
+      <!-- Baris 1: Q W E R T Y U I O P -->
+      <div class="qwerty-row">
+        <button class="key-btn" data-key="Q">Q</button>
+        <button class="key-btn" data-key="W">W</button>
+        <button class="key-btn" data-key="E">E</button>
+        <button class="key-btn" data-key="R">R</button>
+        <button class="key-btn" data-key="T">T</button>
+        <button class="key-btn" data-key="Y">Y</button>
+        <button class="key-btn" data-key="U">U</button>
+        <button class="key-btn" data-key="I">I</button>
+        <button class="key-btn" data-key="O">O</button>
+        <button class="key-btn" data-key="P">P</button>
+      </div>
+
+      <!-- Baris 2: A S D F G H J K L -->
+      <div class="qwerty-row">
+        <button class="key-btn" data-key="A">A</button>
+        <button class="key-btn" data-key="S">S</button>
+        <button class="key-btn" data-key="D">D</button>
+        <button class="key-btn" data-key="F">F</button>
+        <button class="key-btn" data-key="G">G</button>
+        <button class="key-btn" data-key="H">H</button>
+        <button class="key-btn" data-key="J">J</button>
+        <button class="key-btn" data-key="K">K</button>
+        <button class="key-btn" data-key="L">L</button>
+      </div>
+
+      <!-- Baris 3: Z X C V B N M + Hapus -->
+      <div class="qwerty-row">
+        <button class="key-btn" data-key="Z">Z</button>
+        <button class="key-btn" data-key="X">X</button>
+        <button class="key-btn" data-key="C">C</button>
+        <button class="key-btn" data-key="V">V</button>
+        <button class="key-btn" data-key="B">B</button>
+        <button class="key-btn" data-key="N">N</button>
+        <button class="key-btn" data-key="M">M</button>
+        <button class="key-btn key-special" id="btnKeyBackspace" title="Hapus karakter">⌫</button>
+      </div>
+
+      <!-- Baris 4: Spasi & Enter / Search -->
+      <div class="qwerty-row">
+        <button class="key-btn key-special" id="btnKeyClear">Hapus Semua</button>
+        <button class="key-btn key-space" data-key=" ">SPASI</button>
+        <button class="key-btn key-enter" id="btnKeyEnter">ENTER ↵</button>
+      </div>
+
+      <!-- Preset Cepat YouTube -->
+      <div class="yt-quick-presets">
+        <span style="font-size: 9px; color: #888; align-self: center;">Preset:</span>
+        <button class="chip-btn" data-preset="Musik">🎵 Musik</button>
+        <button class="chip-btn" data-preset="Podcast">🎙️ Podcast</button>
+        <button class="chip-btn" data-preset="Review Gadget">📱 Gadget</button>
+        <button class="chip-btn" data-preset="Berita">📰 Berita</button>
+        <button class="chip-btn" data-preset="Lofi Chill">☕ Lofi</button>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         DRAWER 2: NUMPAD 123
+         ============================================================ -->
+    <div class="numpad-drawer" id="numpadDrawer">
+      <div class="drawer-handle" id="numpadHandle"></div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <span style="font-size: 11px; font-weight: 700; color: #8e8e93; text-transform: uppercase;">Tombol Angka</span>
+        <button class="drawer-btn-close" id="btnNumpadClose">Tutup ✕</button>
+      </div>
+
+      <div class="numpad-grid">
+        <button class="btn btn-num" data-hex="0xE0E020DF" data-name="1">1</button>
+        <button class="btn btn-num" data-hex="0xE0E0A05F" data-name="2">2</button>
+        <button class="btn btn-num" data-hex="0xE0E0609F" data-name="3">3</button>
+        <button class="btn btn-num" data-hex="0xE0E010EF" data-name="4">4</button>
+        <button class="btn btn-num" data-hex="0xE0E0906F" data-name="5">5</button>
+        <button class="btn btn-num" data-hex="0xE0E050AF" data-name="6">6</button>
+        <button class="btn btn-num" data-hex="0xE0E030CF" data-name="7">7</button>
+        <button class="btn btn-num" data-hex="0xE0E0B04F" data-name="8">8</button>
+        <button class="btn btn-num" data-hex="0xE0E0708F" data-name="9">9</button>
+        <button class="btn btn-num" data-hex="0xE0E0807F" data-name="Source">SRC</button>
+        <button class="btn btn-num" data-hex="0xE0E08877" data-name="0">0</button>
+        <button class="btn btn-num" data-hex="0xE0E01AE5" data-name="Return">RET</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    /* ============================================================
+       ENCODER PROTOKOL IR SAMSUNG NECx2
+       ============================================================ */
+    const IR_FREQUENCY = 38000;
+
+    /**
+     * Konversi kode HEX 32-bit Samsung ke deretan mikrodetik NECx2:
+     * - Header Mark: 4500 us, Header Space: 4500 us
+     * - Bit Mark: 560 us
+     * - Bit '1' Space: 1690 us
+     * - Bit '0' Space: 560 us
+     * - Stop Bit: 560 us
+     */
+    function hexToSamsungRaw(hexCode) {
+      let numVal;
+      if (typeof hexCode === 'string') {
+        numVal = parseInt(hexCode.replace(/^0x/i, ''), 16);
+      } else {
+        numVal = Number(hexCode);
+      }
+
+      const HDR_MARK = 4500;
+      const HDR_SPACE = 4500;
+      const BIT_MARK = 560;
+      const BIT_ONE_SPACE = 1690;
+      const BIT_ZERO_SPACE = 560;
+      const STOP_BIT = 560;
+
+      const pattern = [HDR_MARK, HDR_SPACE];
+
+      for (let i = 31; i >= 0; i--) {
+        const bit = (numVal >>> i) & 1;
+        pattern.push(BIT_MARK);
+        pattern.push(bit === 1 ? BIT_ONE_SPACE : BIT_ZERO_SPACE);
+      }
+
+      pattern.push(STOP_BIT);
+      return pattern.join(',');
+    }
+
+    /* Elemen DOM */
+    const irBulb = document.getElementById('irBulb');
+    const toast = document.getElementById('toast');
+    const bridgeStatusDot = document.getElementById('bridgeStatusDot');
+    const bridgeStatusText = document.getElementById('bridgeStatusText');
+    const debugConsole = document.getElementById('debugConsole');
+    const lastTxSummary = document.getElementById('lastTxSummary');
+    const btnToggleDebug = document.getElementById('btnToggleDebug');
+    
+    // Numpad Drawer
+    const numpadDrawer = document.getElementById('numpadDrawer');
+    const btnNumpadOpen = document.getElementById('btnNumpadOpen');
+    const btnNumpadClose = document.getElementById('btnNumpadClose');
+    const numpadHandle = document.getElementById('numpadHandle');
+
+    // QWERTY Keyboard Drawer
+    const qwertyDrawer = document.getElementById('qwertyDrawer');
+    const btnQwertyOpen = document.getElementById('btnQwertyOpen');
+    const btnQwertyClose = document.getElementById('btnQwertyClose');
+    const qwertyHandle = document.getElementById('qwertyHandle');
+    const ytInput = document.getElementById('ytInput');
+    const btnAutoTypeYt = document.getElementById('btnAutoTypeYt');
+    const btnKeyBackspace = document.getElementById('btnKeyBackspace');
+    const btnKeyClear = document.getElementById('btnKeyClear');
+    const btnKeyEnter = document.getElementById('btnKeyEnter');
+
+    let toastTimer = null;
+
+    function checkAndroidBridge() {
+      const hasBridge = typeof window.AndroidIR !== 'undefined' && typeof window.AndroidIR.transmitIR === 'function';
+      if (hasBridge) {
+        bridgeStatusDot.className = 'status-dot online';
+        bridgeStatusText.textContent = 'Android IR Ready';
+        logDebug('[BRIDGE] window.AndroidIR terdeteksi. Siap transmisi hardware Poco X7 Pro.');
+      } else {
+        bridgeStatusDot.className = 'status-dot simulated';
+        bridgeStatusText.textContent = 'Browser Simulation';
+        logDebug('[BRIDGE] window.AndroidIR tidak terdeteksi. Mode simulasi aktif (aman untuk testing PC).');
+      }
+      return hasBridge;
+    }
+
+    function showToast(message) {
+      if (toastTimer) clearTimeout(toastTimer);
+      toast.textContent = message;
+      toast.classList.add('show');
+      toastTimer = setTimeout(() => {
+        toast.classList.remove('show');
+      }, 1500);
+    }
+
+    function logDebug(msg) {
+      const timestamp = new Date().toLocaleTimeString('id-ID', { hour12: false });
+      const line = '[' + timestamp + '] ' + msg;
+      debugConsole.innerHTML = '<div>' + line + '</div>' + debugConsole.innerHTML;
+    }
+
+    function triggerIrFlash() {
+      irBulb.classList.add('transmitting');
+      setTimeout(() => {
+        irBulb.classList.remove('transmitting');
+      }, 140);
+    }
+
+    /**
+     * Transmisi perintah IR
+     */
+    function sendIrCommand(hexCode, buttonName) {
+      // 1. Haptic getar 40ms
+      if (navigator.vibrate) {
+        navigator.vibrate(40);
+      }
+
+      // 2. LED flash
+      triggerIrFlash();
+
+      // 3. Konversi ke pulsa raw
+      const rawPatternString = hexToSamsungRaw(hexCode);
+      const pulseCount = rawPatternString.split(',').length;
+
+      lastTxSummary.textContent = buttonName + ' · ' + hexCode;
+
+      // 4. Kirim ke bridge AndroidIR
+      if (typeof window.AndroidIR !== 'undefined' && typeof window.AndroidIR.transmitIR === 'function') {
+        try {
+          window.AndroidIR.transmitIR(IR_FREQUENCY, rawPatternString);
+          showToast('📡 [IR] ' + buttonName);
+          logDebug('[TRANSMIT-OK] ' + buttonName + ' (' + hexCode + ') -> 38kHz, ' + pulseCount + ' pulsa.');
+        } catch (err) {
+          showToast('⚠️ Gagal: ' + err.message);
+          logDebug('[ERROR] ' + err.message);
+        }
+      } else {
+        // Simulasi jika dites di browser
+        showToast('⚡ [SIMULASI] ' + buttonName);
+        logDebug('[SIMULASI] ' + buttonName + ' | ' + hexCode);
+      }
+    }
+
+    /* Pasang Listener ke semua tombol IR */
+    document.querySelectorAll('[data-hex]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const hex = btn.getAttribute('data-hex');
+        const name = btn.getAttribute('data-name') || btn.textContent.trim();
+        sendIrCommand(hex, name);
+      });
+    });
+
+    /* Numpad Drawer Toggle */
+    btnNumpadOpen.addEventListener('click', () => {
+      if (navigator.vibrate) navigator.vibrate(20);
+      qwertyDrawer.classList.remove('open');
+      numpadDrawer.classList.add('open');
+    });
+    btnNumpadClose.addEventListener('click', () => numpadDrawer.classList.remove('open'));
+    numpadHandle.addEventListener('click', () => numpadDrawer.classList.remove('open'));
+
+    /* QWERTY Keyboard Drawer Toggle */
+    btnQwertyOpen.addEventListener('click', () => {
+      if (navigator.vibrate) navigator.vibrate(20);
+      numpadDrawer.classList.remove('open');
+      qwertyDrawer.classList.add('open');
+      setTimeout(() => ytInput.focus(), 250);
+    });
+    btnQwertyClose.addEventListener('click', () => qwertyDrawer.classList.remove('open'));
+    qwertyHandle.addEventListener('click', () => qwertyDrawer.classList.remove('open'));
+
+    /* Input Karakter QWERTY */
+    document.querySelectorAll('.key-btn[data-key]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (navigator.vibrate) navigator.vibrate(25);
+        const char = btn.getAttribute('data-key');
+        ytInput.value += char;
+        // Beri haptic visual
+        showToast('Ketik: ' + char);
+      });
+    });
+
+    // Backspace
+    btnKeyBackspace.addEventListener('click', () => {
+      if (navigator.vibrate) navigator.vibrate(30);
+      ytInput.value = ytInput.value.slice(0, -1);
+      // Kirim perintah Back/Return ke TV jika input kosong
+      if (!ytInput.value) {
+        sendIrCommand('0xE0E01AE5', 'Back / Hapus');
+      }
+    });
+
+    // Hapus Semua
+    btnKeyClear.addEventListener('click', () => {
+      if (navigator.vibrate) navigator.vibrate(20);
+      ytInput.value = '';
+    });
+
+    // Enter / Search (Kirim OK/Enter HEX: 0xE0E016E9)
+    btnKeyEnter.addEventListener('click', () => {
+      sendIrCommand('0xE0E016E9', 'Enter / Search');
+    });
+
+    // Preset Cepat YouTube
+    document.querySelectorAll('.chip-btn[data-preset]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        if (navigator.vibrate) navigator.vibrate(25);
+        const txt = chip.getAttribute('data-preset');
+        ytInput.value = txt;
+        showToast('Preset: ' + txt);
+      });
+    });
+
+    // Tombol CARI YouTube di input box
+    btnAutoTypeYt.addEventListener('click', () => {
+      const query = ytInput.value.trim();
+      if (!query) {
+        showToast('Ketik kata kunci terlebih dahulu');
+        return;
+      }
+      // Eksekusi OK/Enter untuk mengonfirmasi pencarian di YouTube TV
+      sendIrCommand('0xE0E016E9', 'Cari: ' + query);
+      showToast('🔍 Mencari: "' + query + '" di TV');
+    });
+
+    // Toggle Console
+    btnToggleDebug.addEventListener('click', () => {
+      debugConsole.classList.toggle('show');
+      btnToggleDebug.textContent = debugConsole.classList.contains('show') ? 'Tutup' : 'Logs';
+    });
+
+    window.addEventListener('DOMContentLoaded', () => {
+      checkAndroidBridge();
+    });
+  </script>
+</body>
+</html>
