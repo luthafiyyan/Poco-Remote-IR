@@ -597,7 +597,13 @@
           <option value="hisense">Hisense / Toshiba TV</option>
           <option value="coocaa">Coocaa / Changhong TV</option>
           <option value="panasonic">Panasonic Viera TV</option>
-          <option value="monitor">Monitor PC (Samsung/LG/AOC)</option>
+          <option value="asus_monitor">ASUS Monitor (ROG / TUF)</option>
+          <option value="hp_monitor">HP Monitor (OMEN / Pavilion)</option>
+          <option value="lenovo_monitor">Lenovo Monitor (Legion / ThinkVision)</option>
+          <option value="dell_monitor">Dell / Alienware Monitor</option>
+          <option value="benq_monitor">BenQ Monitor (Mobiuz / Zowie)</option>
+          <option value="acer_monitor">Acer Monitor (Predator / Nitro)</option>
+          <option value="monitor">Universal PC Monitor</option>
         </select>
       </div>
 
@@ -926,6 +932,78 @@
           ok: '0x400401009293', back: '0x40040100CBCA', home: '0x400401003D3C', menu: '0x400401004A4B', exit: '0x40040100CBCA',
           num0: '0x400401009091', num1: '0x400401001819', num2: '0x400401009899', num3: '0x400401005859', num4: '0x40040100D8D9',
           num5: '0x400401003839', num6: '0x40040100B8B9', num7: '0x400401007879', num8: '0x40040100F8F9', num9: '0x400401001011'
+        }
+      },
+      asus_monitor: {
+        name: 'ASUS Monitor (ROG / TUF)',
+        protocol: 'nec',
+        freq: 38000,
+        codes: {
+          power: '0x00FF02FD', source: '0x00FF807F', volUp: '0x00FFE01F', volDown: '0x00FFD02F', mute: '0x00FFF00F',
+          chUp: '0x00FF48B7', chDown: '0x00FF08F7', up: '0x00FF06F9', down: '0x00FF8679', left: '0x00FFA659', right: '0x00FF46B9',
+          ok: '0x00FF16E9', back: '0x00FF1AE5', home: '0x00FF9E61', menu: '0x00FF58A7', exit: '0x00FF1AE5',
+          num0: '0x00FF8877', num1: '0x00FF20DF', num2: '0x00FFA05F', num3: '0x00FF609F', num4: '0x00FF10EF',
+          num5: '0x00FF906F', num6: '0x00FF50AF', num7: '0x00FF30CF', num8: '0x00FFB04F', num9: '0x00FF708F'
+        }
+      },
+      hp_monitor: {
+        name: 'HP Monitor (OMEN / Pavilion)',
+        protocol: 'nec',
+        freq: 38000,
+        codes: {
+          power: '0x807F02FD', source: '0x807F807F', volUp: '0x807FE01F', volDown: '0x807FD02F', mute: '0x807FF00F',
+          chUp: '0x807F48B7', chDown: '0x807F08F7', up: '0x807F06F9', down: '0x807F8679', left: '0x807FA659', right: '0x807F46B9',
+          ok: '0x807F16E9', back: '0x807F1AE5', home: '0x807F9E61', menu: '0x807F58A7', exit: '0x807FB44B',
+          num0: '0x807F8877', num1: '0x807F20DF', num2: '0x807FA05F', num3: '0x807F609F', num4: '0x807F10EF',
+          num5: '0x807F906F', num6: '0x807F50AF', num7: '0x807F30CF', num8: '0x807FB04F', num9: '0x807F708F'
+        }
+      },
+      lenovo_monitor: {
+        name: 'Lenovo Monitor (Legion / ThinkVision)',
+        protocol: 'nec',
+        freq: 38000,
+        codes: {
+          power: '0x10EF02FD', source: '0x10EF807F', volUp: '0x10EFE01F', volDown: '0x10EFD02F', mute: '0x10EFF00F',
+          chUp: '0x10EF48B7', chDown: '0x10EF08F7', up: '0x10EF06F9', down: '0x10EF8679', left: '0x10EFA659', right: '0x10EF46B9',
+          ok: '0x10EF16E9', back: '0x10EF1AE5', home: '0x10EF9E61', menu: '0x10EF58A7', exit: '0x10EFB44B',
+          num0: '0x10EF8877', num1: '0x10EF20DF', num2: '0x10EFA05F', num3: '0x10EF609F', num4: '0x10EF10EF',
+          num5: '0x10EF906F', num6: '0x10EF50AF', num7: '0x10EF30CF', num8: '0x10EFB04F', num9: '0x10EF708F'
+        }
+      },
+      dell_monitor: {
+        name: 'Dell / Alienware Monitor',
+        protocol: 'nec',
+        freq: 38000,
+        codes: {
+          power: '0x40BF02FD', source: '0x40BF807F', volUp: '0x40BFE01F', volDown: '0x40BFD02F', mute: '0x40BFF00F',
+          chUp: '0x40BF48B7', chDown: '0x40BF08F7', up: '0x40BF06F9', down: '0x40BF8679', left: '0x40BFA659', right: '0x40BF46B9',
+          ok: '0x40BF16E9', back: '0x40BF1AE5', home: '0x40BF9E61', menu: '0x40BF58A7', exit: '0x40BFB44B',
+          num0: '0x40BF8877', num1: '0x40BF20DF', num2: '0x40BFA05F', num3: '0x40BF609F', num4: '0x40BF10EF',
+          num5: '0x40BF906F', num6: '0x40BF50AF', num7: '0x40BF30CF', num8: '0x40BFB04F', num9: '0x40BF708F'
+        }
+      },
+      benq_monitor: {
+        name: 'BenQ Monitor (Mobiuz / Zowie)',
+        protocol: 'nec',
+        freq: 38000,
+        codes: {
+          power: '0x01FE02FD', source: '0x01FE8877', volUp: '0x01FE58A7', volDown: '0x01FE7887', mute: '0x01FE18E7',
+          chUp: '0x01FE48B7', chDown: '0x01FE6897', up: '0x01FEA857', down: '0x01FE9867', left: '0x01FEE817', right: '0x01FEC837',
+          ok: '0x01FE08F7', back: '0x01FEB847', home: '0x01FE38C7', menu: '0x01FE28D7', exit: '0x01FED827',
+          num0: '0x01FE00FF', num1: '0x01FE807F', num2: '0x01FE40BF', num3: '0x01FEC03F', num4: '0x01FE20DF',
+          num5: '0x01FEA05F', num6: '0x01FE609F', num7: '0x01FEE01F', num8: '0x01FE10EF', num9: '0x01FE906F'
+        }
+      },
+      acer_monitor: {
+        name: 'Acer Monitor (Predator / Nitro)',
+        protocol: 'nec',
+        freq: 38000,
+        codes: {
+          power: '0x02FD02FD', source: '0x02FD38C7', volUp: '0x02FD58A7', volDown: '0x02FD7887', mute: '0x02FD08F7',
+          chUp: '0x02FD18E7', chDown: '0x02FD28D7', up: '0x02FD8877', down: '0x02FD9867', left: '0x02FDA857', right: '0x02FDB847',
+          ok: '0x02FDC837', back: '0x02FDE817', home: '0x02FDD827', menu: '0x02FDF807', exit: '0x02FDE817',
+          num0: '0x02FD00FF', num1: '0x02FD807F', num2: '0x02FD40BF', num3: '0x02FDC03F', num4: '0x02FD20DF',
+          num5: '0x02FDA05F', num6: '0x02FD609F', num7: '0x02FDE01F', num8: '0x02FD10EF', num9: '0x02FD906F'
         }
       },
       monitor: {

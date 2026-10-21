@@ -284,52 +284,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Top Floating Action Buttons (PWA Install, Oscilloscope, Android Code, Download) */}
-      <div className="fixed top-2.5 right-2.5 z-40 flex items-center gap-1.5">
-        {!isStandalone && (
-          <button
-            onClick={handleInstallClick}
-            className="p-1.5 px-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 active:scale-95 text-black font-extrabold transition-all shadow-md shadow-amber-400/25 flex items-center gap-1.5 text-xs cursor-pointer animate-in fade-in"
-            title="Instal aplikasi ini ke layar utama HP Poco / Android"
-          >
-            <Smartphone className="w-3.5 h-3.5 stroke-[2.5]" />
-            <span>Instal App</span>
-          </button>
-        )}
-
-        <button
-          onClick={() => {
-            if (!currentAnalysis) {
-              const defaultCmd = activeBrand.commands.power || Object.values(activeBrand.commands)[0];
-              setCurrentAnalysis(analyzeIrPulse(defaultCmd.hex, activeBrand, defaultCmd.name));
-            }
-            setIsOscilloscopeOpen(true);
-          }}
-          className="p-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] active:scale-95 border border-white/10 text-slate-300 hover:text-white transition-all shadow-md flex items-center gap-1 text-xs font-medium cursor-pointer"
-          title="Buka Oscilloscope Sinyal IR"
-        >
-          <Activity className="w-3.5 h-3.5 text-amber-400" />
-          <span className="hidden md:inline">Oskiloskop</span>
-        </button>
-
-        <button
-          onClick={() => setIsAndroidCodeModalOpen(true)}
-          className="p-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] active:scale-95 border border-white/10 text-slate-300 hover:text-white transition-all shadow-md flex items-center gap-1 text-xs font-medium cursor-pointer"
-          title="Lihat Kode Android Studio (MainActivity.kt)"
-        >
-          <Code2 className="w-3.5 h-3.5 text-sky-400" />
-          <span className="hidden md:inline">Android Studio</span>
-        </button>
-
-        <button
-          onClick={handleDownloadHtml}
-          className="p-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] active:scale-95 border border-white/10 text-slate-300 hover:text-white transition-all shadow-md flex items-center gap-1 text-xs font-medium cursor-pointer"
-          title="Download single-file index.html"
-        >
-          <Download className="w-3.5 h-3.5 text-emerald-400" />
-        </button>
-      </div>
-
       {/* ============================================================
           MAIN CHASSIS CONTAINER (POCO CYBERPUNK / OLED DARK THEME)
           ============================================================ */}
@@ -394,8 +348,20 @@ export default function App() {
             </div>
           </button>
 
-          {/* Quick Controls: Sound & Native Bridge Status */}
-          <div className="flex items-center gap-2">
+          {/* Quick Controls: Install, Sound & Native Bridge Status */}
+          <div className="flex items-center gap-1.5">
+            {/* PWA Install Button (Inline & Non-intrusive) */}
+            {!isStandalone && (
+              <button
+                onClick={handleInstallClick}
+                className="px-2 py-1 rounded-xl bg-amber-400 hover:bg-amber-300 active:scale-95 text-black font-extrabold text-[10px] flex items-center gap-1 shadow-sm transition-all cursor-pointer"
+                title="Instal aplikasi ke layar utama HP Poco"
+              >
+                <Smartphone className="w-3 h-3 stroke-[2.5]" />
+                <span className="hidden sm:inline">Instal</span>
+              </button>
+            )}
+
             {/* Audio Feedback Toggle */}
             <button
               onClick={() => {
@@ -848,17 +814,39 @@ export default function App() {
 
         {/* Footer: Transmission Log Stream & Status Ticker */}
         <div className="pt-2 px-1 flex items-center justify-between text-[10px] text-slate-400">
-          <span className="font-mono truncate max-w-[240px]">
+          <span className="font-mono truncate max-w-[180px]">
             {lastCommand
-              ? `${lastCommand.name} (${lastCommand.hex}) @ ${lastCommand.freq / 1000}kHz`
-              : `${activeBrand.name} · Siap Transmisi`}
+              ? `${lastCommand.name} (${lastCommand.hex})`
+              : `${activeBrand.name} · Siap`}
           </span>
-          <button
-            onClick={() => setIsLogOpen(!isLogOpen)}
-            className="text-amber-400 hover:text-amber-300 underline font-medium cursor-pointer"
-          >
-            {isLogOpen ? 'Tutup Log' : 'Log IR'}
-          </button>
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => {
+                if (!currentAnalysis) {
+                  const defaultCmd = activeBrand.commands.power || Object.values(activeBrand.commands)[0];
+                  setCurrentAnalysis(analyzeIrPulse(defaultCmd.hex, activeBrand, defaultCmd.name));
+                }
+                setIsOscilloscopeOpen(true);
+              }}
+              className="text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
+              title="Analisis Gelombang Pulsa IR"
+            >
+              Oskiloskop
+            </button>
+            <button
+              onClick={() => setIsAndroidCodeModalOpen(true)}
+              className="text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
+              title="Kode Android Studio"
+            >
+              Android Studio
+            </button>
+            <button
+              onClick={() => setIsLogOpen(!isLogOpen)}
+              className="text-amber-400 hover:text-amber-300 font-medium cursor-pointer"
+            >
+              {isLogOpen ? 'Tutup Log' : 'Log IR'}
+            </button>
+          </div>
         </div>
 
         {/* Collapsible Log Stream */}
