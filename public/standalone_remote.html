@@ -594,7 +594,8 @@
           <option value="polytron">Polytron Cinemax / Google TV</option>
           <option value="tcl">TCL Smart Google TV</option>
           <option value="sharp">Sharp Aquos Android TV</option>
-          <option value="hisense">Hisense / Toshiba TV</option>
+          <option value="toshiba">Toshiba Smart TV (REGZA)</option>
+          <option value="hisense">Hisense Smart TV (VIDAA)</option>
           <option value="coocaa">Coocaa / Changhong TV</option>
           <option value="panasonic">Panasonic Viera TV</option>
           <option value="asus_monitor">ASUS Monitor (ROG / TUF)</option>
@@ -898,8 +899,20 @@
           num5: '0x02FDA05F', num6: '0x02FD609F', num7: '0x02FDE01F', num8: '0x02FD10EF', num9: '0x02FD906F'
         }
       },
+      toshiba: {
+        name: 'Toshiba Smart TV (REGZA)',
+        protocol: 'nec',
+        freq: 38000,
+        codes: {
+          power: '0x02FD48B7', source: '0x02FDF807', volUp: '0x02FD58A7', volDown: '0x02FD7887', mute: '0x02FD08F7',
+          chUp: '0x02FD18E7', chDown: '0x02FD28D7', up: '0x02FD8877', down: '0x02FD9867', left: '0x02FDA857', right: '0x02FDB847',
+          ok: '0x02FDC837', back: '0x02FDE817', home: '0x02FDD827', menu: '0x02FD6897', exit: '0x02FDE817',
+          num0: '0x02FD00FF', num1: '0x02FD807F', num2: '0x02FD40BF', num3: '0x02FDC03F', num4: '0x02FD20DF',
+          num5: '0x02FDA05F', num6: '0x02FD609F', num7: '0x02FDE01F', num8: '0x02FD10EF', num9: '0x02FD906F'
+        }
+      },
       hisense: {
-        name: 'Hisense / Toshiba TV',
+        name: 'Hisense Smart TV (VIDAA)',
         protocol: 'nec',
         freq: 38000,
         codes: {
