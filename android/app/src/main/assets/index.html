@@ -1,0 +1,1359 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Poco Universal IR Remote & QWERTY Typist</title>
+  
+  <!-- PWA Manifest & Mobile Standalone -->
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#ffce00" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+  <link rel="apple-touch-icon" href="/icon.svg" />
+
+  <style>
+    :root {
+      --bg-primary: #07090e;
+      --glass-panel: rgba(18, 24, 38, 0.72);
+      --glass-border: rgba(255, 255, 255, 0.12);
+      --glass-highlight: rgba(255, 255, 255, 0.08);
+      --glass-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+      
+      --poco-yellow: #ffce00;
+      --poco-yellow-glow: rgba(255, 206, 0, 0.45);
+      --accent-red: #ff3b30;
+      --accent-red-glow: rgba(255, 59, 48, 0.45);
+      --accent-sky: #0ea5e9;
+      --text-main: #f5f5f7;
+      --text-muted: #8e8e93;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: radial-gradient(circle at 50% 8%, #171d2b 0%, #0c101a 55%, #05070a 100%);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      overflow-x: hidden;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    }
+
+    .remote-container {
+      width: 100%;
+      max-width: 420px;
+      padding: 10px 14px 18px 14px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    /* Top Notch Chassis */
+    .poco-notch {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 14px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      margin-bottom: 8px;
+    }
+
+    .punch-hole {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #000;
+      border: 1px solid #444;
+    }
+
+    .speaker-slit {
+      width: 44px;
+      height: 3px;
+      background: #333;
+      border-radius: 3px;
+    }
+
+    .ir-emitter-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .ir-bulb {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #2a2d35;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      transition: all 0.12s ease;
+    }
+
+    .ir-bulb.transmitting {
+      background: #ff2d55;
+      box-shadow: 0 0 16px #ff2d55, 0 0 28px #ffce00;
+      border-color: #ffffff;
+      transform: scale(1.25);
+    }
+
+    /* Header Bar: Brand Select & Audio */
+    .header-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: var(--glass-panel);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: blur(16px);
+      border-radius: 18px;
+      margin-bottom: 10px;
+    }
+
+    .brand-select-wrap {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .brand-label {
+      font-size: 8.5px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .brand-select {
+      background: transparent;
+      border: none;
+      color: var(--poco-yellow);
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .brand-select option {
+      background: #0c101a;
+      color: #fff;
+    }
+
+    /* Tab Switcher */
+    .tabs-bar {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr 1fr;
+      gap: 5px;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 4px;
+      border-radius: 16px;
+      border: 1px solid var(--glass-border);
+      margin-bottom: 12px;
+    }
+
+    .tab-btn {
+      padding: 8px 4px;
+      border-radius: 12px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      background: var(--poco-yellow);
+      color: #000;
+      box-shadow: 0 2px 10px var(--poco-yellow-glow);
+    }
+
+    /* Glass Panels */
+    .view-panel {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .view-panel.active {
+      display: flex;
+    }
+
+    .remote-body {
+      background: var(--glass-panel);
+      border: 1px solid var(--glass-border);
+      border-radius: 30px;
+      padding: 14px;
+      box-shadow: var(--glass-shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* Buttons */
+    .btn {
+      border: 1px solid var(--glass-border);
+      background: rgba(255, 255, 255, 0.05);
+      color: #fff;
+      border-radius: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.1s;
+    }
+
+    .btn:active {
+      transform: scale(0.92);
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .top-action-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .btn-power {
+      height: 48px;
+      background: rgba(255, 59, 48, 0.15);
+      border-color: rgba(255, 59, 48, 0.4);
+      color: #ff453a;
+      flex-direction: column;
+      font-size: 8.5px;
+      font-weight: 800;
+    }
+
+    .btn-power:active {
+      background: rgba(255, 59, 48, 0.35);
+      box-shadow: 0 0 16px rgba(255, 59, 48, 0.5);
+    }
+
+    /* D-Pad */
+    .dpad-container {
+      display: flex;
+      justify-content: center;
+      padding: 6px 0;
+    }
+
+    .dpad-outer {
+      position: relative;
+      width: 196px;
+      height: 196px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--glass-border);
+      box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.6), 0 8px 24px rgba(0, 0, 0, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .dpad-dir {
+      position: absolute;
+      background: transparent;
+      border: none;
+      color: #d1d5db;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.12s;
+    }
+
+    .dpad-dir:active {
+      color: var(--poco-yellow);
+      transform: scale(0.88);
+    }
+
+    .dpad-up { top: 4px; left: 50%; transform: translateX(-50%); width: 64px; height: 48px; }
+    .dpad-down { bottom: 4px; left: 50%; transform: translateX(-50%); width: 64px; height: 48px; }
+    .dpad-left { left: 4px; top: 50%; transform: translateY(-50%); width: 48px; height: 64px; }
+    .dpad-right { right: 4px; top: 50%; transform: translateY(-50%); width: 48px; height: 64px; }
+
+    .dpad-center-ok {
+      width: 78px;
+      height: 78px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #ffd000, #ffaa00);
+      color: #000;
+      font-size: 15px;
+      font-weight: 900;
+      border: 1px solid #ffe066;
+      box-shadow: 0 4px 18px var(--poco-yellow-glow);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.12s;
+    }
+
+    .dpad-center-ok:active {
+      transform: scale(0.9);
+      box-shadow: 0 0 26px var(--poco-yellow);
+    }
+
+    /* Rockers */
+    .rockers-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .rocker-pill {
+      height: 108px;
+      border-radius: 28px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--glass-border);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px;
+    }
+
+    .rocker-btn {
+      width: 100%;
+      height: 38px;
+      border-radius: 22px;
+      border: 1px solid var(--glass-border);
+      background: rgba(255, 255, 255, 0.05);
+      color: #fff;
+      font-size: 17px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .rocker-btn:active {
+      background: var(--poco-yellow);
+      color: #000;
+      transform: scale(0.92);
+    }
+
+    .rocker-label {
+      font-size: 9px;
+      font-weight: 800;
+      color: var(--text-muted);
+    }
+
+    .center-actions {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-mute {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--glass-border);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .btn-mute:active {
+      background: rgba(255, 59, 48, 0.3);
+      color: #ff453a;
+      transform: scale(0.92);
+    }
+
+    /* QWERTY Suite */
+    .search-input-box {
+      display: flex;
+      gap: 6px;
+    }
+
+    .search-input {
+      flex: 1;
+      height: 40px;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid var(--glass-border);
+      border-radius: 14px;
+      padding: 0 12px;
+      color: #fff;
+      font-size: 12px;
+      outline: none;
+    }
+
+    .search-input:focus {
+      border-color: var(--poco-yellow);
+    }
+
+    .btn-voice {
+      width: 40px;
+      height: 40px;
+      border-radius: 14px;
+      border: 1px solid var(--glass-border);
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--poco-yellow);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-voice.listening {
+      background: #ff3b30;
+      color: #fff;
+      animation: pulse 1s infinite;
+    }
+
+    .btn-autotype {
+      height: 40px;
+      padding: 0 14px;
+      border-radius: 14px;
+      border: none;
+      background: var(--poco-yellow);
+      color: #000;
+      font-size: 11px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .btn-autotype:active {
+      transform: scale(0.94);
+    }
+
+    .qwerty-grid {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--glass-border);
+      border-radius: 24px;
+      padding: 10px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .qwerty-row {
+      display: flex;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    .key-btn {
+      height: 36px;
+      flex: 1;
+      min-width: 26px;
+      border-radius: 10px;
+      border: 1px solid var(--glass-border);
+      background: rgba(255, 255, 255, 0.07);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .key-btn:active {
+      background: var(--poco-yellow);
+      color: #000;
+      transform: scale(0.9);
+    }
+
+    .chips-row {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+
+    .chip-btn {
+      padding: 4px 10px;
+      border-radius: 20px;
+      border: 1px solid var(--glass-border);
+      background: rgba(255, 255, 255, 0.05);
+      color: #ccc;
+      font-size: 10px;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .chip-btn:active {
+      background: var(--poco-yellow);
+      color: #000;
+    }
+
+    /* Thumb D-Pad inside Keyboard View */
+    .thumb-nav-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--glass-border);
+      border-radius: 18px;
+    }
+
+    .thumb-cluster {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .thumb-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      border: 1px solid var(--glass-border);
+      background: rgba(255, 255, 255, 0.07);
+      color: #fff;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .thumb-btn:active {
+      background: var(--poco-yellow);
+      color: #000;
+      transform: scale(0.9);
+    }
+
+    /* Numpad View */
+    .numpad-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .btn-num {
+      height: 48px;
+      border-radius: 16px;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    /* Log Stream */
+    .log-stream {
+      margin-top: 10px;
+      padding: 8px 10px;
+      background: rgba(0, 0, 0, 0.85);
+      border: 1px solid var(--glass-border);
+      border-radius: 14px;
+      font-family: monospace;
+      font-size: 9.5px;
+      color: var(--poco-yellow);
+      max-height: 70px;
+      overflow-y: auto;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="remote-container">
+    
+    <!-- Top Notch Chassis -->
+    <div class="poco-notch">
+      <div class="punch-hole"></div>
+      <div class="speaker-slit"></div>
+      <div class="ir-emitter-indicator">
+        <span style="font-size: 8.5px; font-weight: 800; color: #ffce00; font-family: monospace;">POCO IR</span>
+        <div class="ir-bulb" id="irBulb"></div>
+      </div>
+    </div>
+
+    <!-- Header Bar: Brand Selector -->
+    <div class="header-bar">
+      <div class="brand-select-wrap">
+        <span class="brand-label">Target Perangkat</span>
+        <select id="brandSelect" class="brand-select">
+          <option value="samsung" selected>Samsung Smart TV / Monitor</option>
+          <option value="lg">LG Smart TV (webOS) / Monitor</option>
+          <option value="xiaomi">Xiaomi / Mi TV / Redmi</option>
+          <option value="sony">Sony Bravia (Google TV)</option>
+          <option value="polytron">Polytron Cinemax / Google TV</option>
+          <option value="tcl">TCL Smart Google TV</option>
+          <option value="sharp">Sharp Aquos Android TV</option>
+          <option value="toshiba">Toshiba TV (REGZA / CT-Series)</option>
+          <option value="toshiba_android">Toshiba Android TV (C350/M550)</option>
+          <option value="hisense">Hisense Smart TV (VIDAA)</option>
+          <option value="coocaa">Coocaa / Changhong TV</option>
+          <option value="panasonic">Panasonic Viera TV</option>
+          <option value="asus_monitor">ASUS Monitor (ROG / TUF)</option>
+          <option value="hp_monitor">HP Monitor (OMEN / Pavilion)</option>
+          <option value="lenovo_monitor">Lenovo Monitor (Legion / ThinkVision)</option>
+          <option value="dell_monitor">Dell / Alienware Monitor</option>
+          <option value="benq_monitor">BenQ Monitor (Mobiuz / Zowie)</option>
+          <option value="acer_monitor">Acer Monitor (Predator / Nitro)</option>
+          <option value="monitor">Universal PC Monitor</option>
+        </select>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <button id="btnSoundToggle" class="btn" style="width: 32px; height: 32px; border-radius: 10px;" title="Suara Klik">
+          🔊
+        </button>
+        <span id="carrierBadge" style="font-size: 9px; font-family: monospace; color: #ffce00; padding: 2px 6px; background: rgba(255,206,0,0.1); border-radius: 8px;">
+          38 kHz
+        </span>
+      </div>
+    </div>
+
+    <!-- Tabs Navigation -->
+    <div class="tabs-bar">
+      <button class="tab-btn active" id="tabRemote">📱 Remote</button>
+      <button class="tab-btn" id="tabKeyboard">⌨️ QWERTY</button>
+      <button class="tab-btn" id="tabNumpad">🔢 1 2 3</button>
+    </div>
+
+    <!-- ==========================================
+         VIEW 1: REMOTE UTAMA
+         ========================================== -->
+    <div class="view-panel active" id="panelRemote">
+      <div class="remote-body">
+        
+        <!-- Baris Power, Qwerty, Source, Menu -->
+        <div class="top-action-grid">
+          <button class="btn btn-power" id="btnPower">
+            <span style="font-size: 15px;">⏻</span>
+            <span>POWER</span>
+          </button>
+          <button class="btn" id="btnQuickQwerty" style="height: 48px; flex-direction: column; font-size: 8.5px; font-weight: 700; color: #ffce00; border-color: rgba(255,206,0,0.4);">
+            <span style="font-size: 15px;">⌨</span>
+            <span>QWERTY</span>
+          </button>
+          <button class="btn" id="btnSource" style="height: 48px; flex-direction: column; font-size: 8.5px; font-weight: 700;">
+            <span style="font-size: 15px;">📺</span>
+            <span>SOURCE</span>
+          </button>
+          <button class="btn" id="btnMenu" style="height: 48px; flex-direction: column; font-size: 8.5px; font-weight: 700;">
+            <span style="font-size: 15px;">☰</span>
+            <span>MENU</span>
+          </button>
+        </div>
+
+        <!-- D-Pad -->
+        <div class="dpad-container">
+          <div class="dpad-outer">
+            <button class="dpad-dir dpad-up" id="btnUp">▲</button>
+            <button class="dpad-dir dpad-left" id="btnLeft">◀</button>
+            <button class="dpad-center-ok" id="btnOk">OK</button>
+            <button class="dpad-dir dpad-right" id="btnRight">▶</button>
+            <button class="dpad-dir dpad-down" id="btnDown">▼</button>
+          </div>
+        </div>
+
+        <!-- Back, Home, Exit -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+          <button class="btn" id="btnBack" style="height: 42px; font-size: 10px; font-weight: 700;">↩ BACK</button>
+          <button class="btn" id="btnHome" style="height: 42px; font-size: 10px; font-weight: 800; color: #ffce00; border-color: rgba(255,206,0,0.4);">🏠 HOME</button>
+          <button class="btn" id="btnExit" style="height: 42px; font-size: 10px; font-weight: 700;">✕ EXIT</button>
+        </div>
+
+        <!-- Rockers Volume & Channel -->
+        <div class="rockers-row">
+          <div class="rocker-pill">
+            <button class="rocker-btn" id="btnVolUp">+</button>
+            <span class="rocker-label">VOL</span>
+            <button class="rocker-btn" id="btnVolDown">−</button>
+          </div>
+
+          <div class="center-actions">
+            <button class="btn-mute" id="btnMute">
+              <span style="font-size: 16px;">🔇</span>
+              <span style="font-size: 7.5px; font-weight: 800; margin-top: 2px;">MUTE</span>
+            </button>
+            <span style="font-size: 8px; font-family: monospace; color: #888;">IR POCO</span>
+          </div>
+
+          <div class="rocker-pill">
+            <button class="rocker-btn" id="btnChUp">∧</button>
+            <span class="rocker-label">CH</span>
+            <button class="rocker-btn" id="btnChDown">∨</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ==========================================
+         VIEW 2: QWERTY KEYBOARD & TV TYPIST SUITE
+         ========================================== -->
+    <div class="view-panel" id="panelKeyboard">
+      
+      <!-- Input Suite -->
+      <div style="background: var(--glass-panel); border: 1px solid var(--glass-border); border-radius: 22px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+        <div class="search-input-box">
+          <input type="text" id="typeInput" class="search-input" placeholder="Ketik judul video atau URL browser..." />
+          <button id="btnVoice" class="btn-voice" title="Ketik Suara">🎙️</button>
+          <button id="btnAutoType" class="btn-autotype">KIRIM 🚀</button>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; color: #aaa; padding: 0 4px;">
+          <span>Layout: <strong style="color: #ffce00;" id="currentLayoutLabel">YouTube TV Grid</strong></span>
+          <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
+            <input type="checkbox" id="chkDirectKey" checked />
+            <span style="color: #fff;">Ketik Langsung Per Huruf</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Quick Chips: YouTube & URLs -->
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <div class="chips-row">
+          <span style="font-size: 9px; color: #777; align-self: center;">YouTube:</span>
+          <button class="chip-btn" data-val="Lofi Chill">☕ Lofi Beats</button>
+          <button class="chip-btn" data-val="Review Poco">📱 Review HP</button>
+          <button class="chip-btn" data-val="Trailer Film">🎬 Trailer Film</button>
+          <button class="chip-btn" data-val="Podcast">🎙️ Podcast</button>
+          <button class="chip-btn" data-val="Tutorial">💻 Tutorial</button>
+        </div>
+
+        <div class="chips-row">
+          <span style="font-size: 9px; color: #777; align-self: center;">URL:</span>
+          <button class="chip-btn" data-val="https://">https://</button>
+          <button class="chip-btn" data-val="www.">www.</button>
+          <button class="chip-btn" data-val=".com">.com</button>
+          <button class="chip-btn" data-val=".id">.id</button>
+          <button class="chip-btn" data-val="youtube.com">youtube.com</button>
+          <button class="chip-btn" data-val="/">/</button>
+        </div>
+      </div>
+
+      <!-- Ergonomic QWERTY Keyboard -->
+      <div class="qwerty-grid">
+        <div class="qwerty-row">
+          <button class="key-btn" data-k="1">1</button><button class="key-btn" data-k="2">2</button><button class="key-btn" data-k="3">3</button><button class="key-btn" data-k="4">4</button><button class="key-btn" data-k="5">5</button><button class="key-btn" data-k="6">6</button><button class="key-btn" data-k="7">7</button><button class="key-btn" data-k="8">8</button><button class="key-btn" data-k="9">9</button><button class="key-btn" data-k="0">0</button>
+        </div>
+        <div class="qwerty-row">
+          <button class="key-btn" data-k="Q">Q</button><button class="key-btn" data-k="W">W</button><button class="key-btn" data-k="E">E</button><button class="key-btn" data-k="R">R</button><button class="key-btn" data-k="T">T</button><button class="key-btn" data-k="Y">Y</button><button class="key-btn" data-k="U">U</button><button class="key-btn" data-k="I">I</button><button class="key-btn" data-k="O">O</button><button class="key-btn" data-k="P">P</button>
+        </div>
+        <div class="qwerty-row" style="padding: 0 8px;">
+          <button class="key-btn" data-k="A">A</button><button class="key-btn" data-k="S">S</button><button class="key-btn" data-k="D">D</button><button class="key-btn" data-k="F">F</button><button class="key-btn" data-k="G">G</button><button class="key-btn" data-k="H">H</button><button class="key-btn" data-k="J">J</button><button class="key-btn" data-k="K">K</button><button class="key-btn" data-k="L">L</button>
+        </div>
+        <div class="qwerty-row">
+          <button class="key-btn" data-k="Z">Z</button><button class="key-btn" data-k="X">X</button><button class="key-btn" data-k="C">C</button><button class="key-btn" data-k="V">V</button><button class="key-btn" data-k="B">B</button><button class="key-btn" data-k="N">N</button><button class="key-btn" data-k="M">M</button>
+          <button class="key-btn" id="btnBackspace" style="color: #ff453a; font-size: 14px; flex: 1.3;">⌫</button>
+        </div>
+        <div class="qwerty-row">
+          <button class="key-btn" data-k="." style="flex: 0.8;">.</button>
+          <button class="key-btn" id="btnSpace" style="flex: 3; font-size: 10px; letter-spacing: 2px;">SPASI</button>
+          <button class="key-btn" id="btnEnter" style="flex: 1.5; color: #ffce00; font-size: 10px;">ENTER ↵</button>
+        </div>
+      </div>
+
+      <!-- Thumb D-Pad inside Keyboard View -->
+      <div class="thumb-nav-bar">
+        <div style="display: flex; flex-direction: column;">
+          <span style="font-size: 10px; font-weight: 800; color: #fff;">Navigasi Rekomendasi</span>
+          <span style="font-size: 8.5px; color: #888;">Geser hasil pencarian TV</span>
+        </div>
+        <div class="thumb-cluster">
+          <button class="thumb-btn" id="btnThumbLeft">◀</button>
+          <div style="display: flex; flex-direction: column; gap: 3px;">
+            <button class="thumb-btn" id="btnThumbUp" style="height: 20px;">▲</button>
+            <button class="thumb-btn" id="btnThumbDown" style="height: 20px;">▼</button>
+          </div>
+          <button class="thumb-btn" id="btnThumbRight">▶</button>
+          <button class="thumb-btn" id="btnThumbOk" style="width: auto; padding: 0 10px; background: #ffce00; color: #000; font-weight: 800; font-size: 11px;">OK</button>
+          <button class="thumb-btn" id="btnThumbBack">↩</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ==========================================
+         VIEW 3: NUMPAD 123
+         ========================================== -->
+    <div class="view-panel" id="panelNumpad">
+      <div class="remote-body">
+        <div class="numpad-grid">
+          <button class="btn btn-num" data-num="1">1</button>
+          <button class="btn btn-num" data-num="2">2</button>
+          <button class="btn btn-num" data-num="3">3</button>
+          <button class="btn btn-num" data-num="4">4</button>
+          <button class="btn btn-num" data-num="5">5</button>
+          <button class="btn btn-num" data-num="6">6</button>
+          <button class="btn btn-num" data-num="7">7</button>
+          <button class="btn btn-num" data-num="8">8</button>
+          <button class="btn btn-num" data-num="9">9</button>
+          <button class="btn btn-num" id="btnNumpadSrc" style="color: #ffce00; font-size: 11px;">SRC</button>
+          <button class="btn btn-num" data-num="0">0</button>
+          <button class="btn btn-num" id="btnNumpadBack" style="color: #0ea5e9; font-size: 11px;">RET</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status Log Stream -->
+    <div class="log-stream" id="logStream">
+      [READY] Poco Universal IR Remote aktif.
+    </div>
+
+  </div>
+
+  <script>
+    /* ============================================================
+       MULTI-BRAND DATABASE & ENCODER
+       ============================================================ */
+    const BRAND_DB = {
+      samsung: {
+        name: 'Samsung Smart TV / Monitor',
+        protocol: 'samsung_nec',
+        freq: 38000,
+        codes: {
+          power: '0xE0E040BF', source: '0xE0E0807F', volUp: '0xE0E0E01F', volDown: '0xE0E0D02F', mute: '0xE0E0F00F',
+          chUp: '0xE0E048B7', chDown: '0xE0E008F7', up: '0xE0E006F9', down: '0xE0E08679', left: '0xE0E0A659', right: '0xE0E046B9',
+          ok: '0xE0E016E9', back: '0xE0E01AE5', home: '0xE0E09E61', menu: '0xE0E058A7', exit: '0xE0E0B44B',
+          num0: '0xE0E08877', num1: '0xE0E020DF', num2: '0xE0E0A05F', num3: '0xE0E0609F', num4: '0xE0E010EF',
+          num5: '0xE0E0906F', num6: '0xE0E050AF', num7: '0xE0E030CF', num8: '0xE0E0B04F', num9: '0xE0E0708F'
+        }
+      },
+      lg: {
+        name: 'LG Smart TV (webOS) / Monitor',
+        protocol: 'nec',
+        freq: 38000,
+        codes: {
+          power: '0x20DF10EF', source: '0x20DFD02F', volUp: '0x20DF40BF', volDown: '0x20DFC03F', mute: '0x20DF906F',
+          chUp: '0x20DF00FF', chDown: '0x20DF807F', up: '0x20DF02FD', down: '0x20DF827D', left: '0x20DFE01F', right: '0x20DF609F',
+          ok: '0x20DF22DD', back: '0x20DF14EB', home: '0x20DF3EC1', menu: '0x20DFC23D', exit: '0x20DFDA25',
+          num0: '0x20DF08F7', num1: '0x20DF8877', num2: '0x20DF48B7', num3: '0x20DFC837', num4: '0x20DF28D7',
+          num5: '0x20DFA857', num6: '0x20DF6897', num7: '0x20DFE817', num8: '0x20DF18E7', num9: '0x20DF9867'
+        }
+      },
+      xiaomi: {
+        name: 'Xiaomi / Mi TV / Redmi',
+        protocol: 'nec',
+        freq: 38000,
+        codes: {
+          power: '0x04FB02FD', source: '0x04FB609F', volUp: '0x04FB50AF', volDown: '0x04FB708F', mute: '0x04FB48B7',
+          chUp: '0x04FB58A7', chDown: '0x04FB7887', up: '0x04FBA05F', down: '0x04FB00FF', left: '0x04FB10EF', right: '0x04FB807F',
+          ok: '0x04FB20DF', back: '0x04FB906F', home: '0x04FB30CF', menu: '0x04FBB04F', exit: '0x04FB906F',
+          num0: '0x04FB8877', num1: '0x04FB28D7', num2: '0x04FBA857', num3: '0x04FB6897', num4: '0x04FBE817',
+          num5: '0x04FB18E7', num6: '0x04FB9867', num7: '0x04FB58A7', num8: '0x04FBD827', num9: '0x04FB38C7'
+        }
+      },
+      sony: {
+        name: 'Sony Bravia (Google TV)',
+        protocol: 'sony_sirc',
+        freq: 40000,
+        codes: {
+          power: '0x0A90', source: '0x0A50', volUp: '0x0490', volDown: '0x0C90', mute: '0x0290',
+          chUp: '0x0090', chDown: '0x0890', up: '0x02F0', down: '0x0AF0', left: '0x02D0', right: '0x0CD0',
+          ok: '0x0A70', back: '0x0C70', home: '0x0070', menu: '0x36E9', exit: '0x0C70',
+          num0: '0x0910', num1: '0x0010', num2: '0x0810', num3: '0x0410', num4: '0x0C10',
+          num5: '0x0210', num6: '0x0A10', num7: '0x0610', num8: '0x0E10', num9: '0x0110'
+        }
+      },
+      polytron: {
+        name: 'Polytron Cinemax / Google TV',
+        protocol: 'nec',
+        freq: 38000,
+        codes: {
+          power: '0x01FE48B7', source: '0x01FE8877', volUp: '0x01FE58A7', volDown: '0x01FE7887', mute: '0x01FE18E7',
+          chUp: '0x01FE6897', chDown: '0x01FEE01F', up: '0x01FEA857', down: '0x01FE9867', left: '0x01FEE817', right: '0x01FEC837',
+          ok: '0x01FE08F7', back: '0x01FEB847', home: '0x01FE38C7', menu: '0x01FE28D7', exit: '0x01FED827',
+          num0: '0x01FE00FF', num1: '0x01FE807F', num2: '0x01FE40BF', num3: '0x01FEC03F', num4: '0x01FE20DF',
+          num5: '0x01FEA05F', num6: '0x01FE609F', num7: '0x01FEE01F', num8: '0x01FE10EF', num9: '0x01FE906F'
+        }
+      },
+      tcl: {
+        name: 'TCL Smart Google TV',
+        protocol: 'nec',
+        freq: 38000,
+        codes: {
+          power: '0xF10E01FE', source: '0xF10E15EA', volUp: '0xF10E0AF5', volDown: '0xF10E0BF4', mute: '0xF10E0DF2',
+          chUp: '0xF10E07F8', chDown: '0xF10E08F7', up: '0xF10E02FD', down: '0xF10E03FC', left: '0xF10E04FB', right: '0xF10E05FA',
+          ok: '0xF10E06F9', back: '0xF10E14EB', home: '0xF10E13EC', menu: '0xF10E16E9', exit: '0xF10E17E8',
+          num0: '0xF10E1BF4', num1: '0xF10E10EF', num2: '0xF10E11EE', num3: '0xF10E12ED', num4: '0xF10E18E7',
+          num5: '0xF10E19E6', num6: '0xF10E1AE5', num7: '0xF10E20DF', num8: '0xF10E21DE', num9: '0xF10E22DD'
+        }
+      },
+      sharp: {
+        name: 'Sharp Aquos Android TV',
+        protocol: 'nec',
+        freq: 38000,
+        codes: {
+          power: '0x02FD48B7', source: '0x02FD38C7', volUp: '0x02FD58A7', volDown: '0x02FD7887', mute: '0x02FD08F7',
+          chUp: '0x02FD18E7', chDown: '0x02FD28D7', up: '0x02FD8877', down: '0x02FD9867', left: '0x02FDA857', right: '0x02FDB847',
+          ok: '0x02FDC837', back: '0x02FDE817', home: '0x02FDD827', menu: '0x02FDF807', exit: '0x02FDE817',
+          num0: '0x02FD00FF', num1: '0x02FD807F', num2: '0x02FD40BF', num3: '0x02FDC03F', num4: '0x02FD20DF',
+          num5: '0x02FDA05F', num6: '0x02FD609F', num7: '0x02FDE01F', num8: '0x02FD10EF', num9: '0x02FD906F'
+        }
+      },
+      toshiba: {
+        name: 'Toshiba TV (REGZA / CT-Series)',
+        protocol: 'nec',
+        freq: 38000,
+        codes: {
+          power: '0x40BF12ED', source: '0x40BF14EB', volUp: '0x40BF1AE5', volDown: '0x40BF1EE1', mute: '0x40BF10EF',
+          chUp: '0x40BF1BE4', chDown: '0x40BF1FE0', up: '0x40BF19E6', down: '0x40BF1DE2', left: '0x40BF42BD', right: '0x40BF40BF',
+          ok: '0x40BF21DE', back: '0x40BF649B', home: '0x40BF28D7', menu: '0x40BF5BA4', exit: '0x40BF43BC',
+          num0: '0x40BF00FF', num1: '0x40BF01FE', num2: '0x40BF02FD', num3: '0x40BF03FC', num4: '0x40BF04FB',
+          num5: '0x40BF05FA', num6: '0x40BF06F9', num7: '0x40BF07F8', num8: '0x40BF08F7', num9: '0x40BF09F6'
+        }
+      },
+      toshiba_android: {
+        name: 'Toshiba Android TV (C350 / M550)',
+        protocol: 'nec',
+        freq: 38000,
+        codes: {
+          power: '0xBF4001FE', source: '0xBF400DF2', volUp: '0xBF4002FD', volDown: '0xBF4003FC', mute: '0xBF4004FB',
+          chUp: '0xBF4010EF', chDown: '0xBF4011EE', up: '0xBF4005FA', down: '0xBF4006F9', left: '0xBF4007F8', right: '0xBF4008F7',
+          ok: '0xBF4009F6', back: '0xBF400AF5', home: '0xBF400BF4', menu: '0xBF400CF3', exit: '0xBF400EF1',
+          num0: '0xBF4020DF', num1: '0xBF4017E8', num2: '0xBF4018E7', num3: '0xBF4019E6', num4: '0xBF401AE5',
+          num5: '0xBF401BE4', num6: '0xBF401CE3', num7: '0xBF401DE2', num8: '0xBF401EE1', num9: '0xBF401FE0'
+        }
+      },
+      hisense: {
+        name: 'Hisense Smart TV (VIDAA)',
+        protocol: 'nec',
+        freq: 38000,
+        codes: {
+          power: '0xBF4001FE', source: '0xBF400DF2', volUp: '0xBF4002FD', volDown: '0xBF4003FC', mute: '0xBF4004FB',
+          chUp: '0xBF4010EF', chDown: '0xBF4011EE', up: '0xBF4005FA', down: '0xBF4006F9', left: '0xBF4007F8', right: '0xBF4008F7',
+          ok: '0xBF4009F6', back: '0xBF400AF5', home: '0xBF400BF4', menu: '0xBF400CF3', exit: '0xBF400EF1',
+          num0: '0xBF4020DF', num1: '0xBF4017E8', num2: '0xBF4018E7', num3: '0xBF4019E6', num4: '0xBF401AE5',
+          num5: '0xBF401BE4', num6: '0xBF401CE3', num7: '0xBF401DE2', num8: '0xBF401EE1', num9: '0xBF401FE0'
+        }
+      },
+      coocaa: {
+        name: 'Coocaa / Changhong TV',
+        protocol: 'nec',
+        freq: 38000,
+        codes: {
+          power: '0x00FF02FD', source: '0x00FF807F', volUp: '0x00FF12ED', volDown: '0x00FF10EF', mute: '0x00FF0DF2',
+          chUp: '0x00FF48B7', chDown: '0x00FF08F7', up: '0x00FF06F9', down: '0x00FF8679', left: '0x00FFA659', right: '0x00FF46B9',
+          ok: '0x00FF16E9', back: '0x00FF1AE5', home: '0x00FF9E61', menu: '0x00FF58A7', exit: '0x00FFB44B',
+          num0: '0x00FF8877', num1: '0x00FF20DF', num2: '0x00FFA05F', num3: '0x00FF609F', num4: '0x00FF10EF',
+          num5: '0x00FF906F', num6: '0x00FF50AF', num7: '0x00FF30CF', num8: '0x00FFB04F', num9: '0x00FF708F'
+        }
+      },
+      panasonic: {
+        name: 'Panasonic Viera TV',
+        protocol: 'panasonic',
+        freq: 37000,
+        codes: {
+          power: '0x40040100BCBD', source: '0x40040100A0A1', volUp: '0x400401000405', volDown: '0x400401008485', mute: '0x400401004C4D',
+          chUp: '0x400401002C2D', chDown: '0x40040100ACAD', up: '0x400401005253', down: '0x40040100D2D3', left: '0x400401007273', right: '0x40040100F2F3',
+          ok: '0x400401009293', back: '0x40040100CBCA', home: '0x400401003D3C', menu: '0x400401004A4B', exit: '0x40040100CBCA',
+          num0: '0x400401009091', num1: '0x400401001819', num2: '0x400401009899', num3: '0x400401005859', num4: '0x40040100D8D9',
+          num5: '0x400401003839', num6: '0x40040100B8B9', num7: '0x400401007879', num8: '0x40040100F8F9', num9: '0x400401001011'
+        }
+      },
+      asus_monitor: {
+        name: 'ASUS Monitor (ROG / TUF)',
+        protocol: 'nec',
+        freq: 38000,
+        codes: {
+          power: '0x00FF02FD', source: '0x00FF807F', volUp: '0x00FFE01F', volDown: '0x00FFD02F', mute: '0x00FFF00F',
+          chUp: '0x00FF48B7', chDown: '0x00FF08F7', up: '0x00FF06F9', down: '0x00FF8679', left: '0x00FFA659', right: '0x00FF46B9',
+          ok: '0x00FF16E9', back: '0x00FF1AE5', home: '0x00FF9E61', menu: '0x00FF58A7', exit: '0x00FF1AE5',
+          num0: '0x00FF8877', num1: '0x00FF20DF', num2: '0x00FFA05F', num3: '0x00FF609F', num4: '0x00FF10EF',
+          num5: '0x00FF906F', num6: '0x00FF50AF', num7: '0x00FF30CF', num8: '0x00FFB04F', num9: '0x00FF708F'
+        }
+      },
+      hp_monitor: {
+        name: 'HP Monitor (OMEN / Pavilion)',
+        protocol: 'nec',
+        freq: 38000,
+        codes: {
+          power: '0x807F02FD', source: '0x807F807F', volUp: '0x807FE01F', volDown: '0x807FD02F', mute: '0x807FF00F',
+          chUp: '0x807F48B7', chDown: '0x807F08F7', up: '0x807F06F9', down: '0x807F8679', left: '0x807FA659', right: '0x807F46B9',
+          ok: '0x807F16E9', back: '0x807F1AE5', home: '0x807F9E61', menu: '0x807F58A7', exit: '0x807FB44B',
+          num0: '0x807F8877', num1: '0x807F20DF', num2: '0x807FA05F', num3: '0x807F609F', num4: '0x807F10EF',
+          num5: '0x807F906F', num6: '0x807F50AF', num7: '0x807F30CF', num8: '0x807FB04F', num9: '0x807F708F'
+        }
+      },
+      lenovo_monitor: {
+        name: 'Lenovo Monitor (Legion / ThinkVision)',
+        protocol: 'nec',
+        freq: 38000,
+        codes: {
+          power: '0x10EF02FD', source: '0x10EF807F', volUp: '0x10EFE01F', volDown: '0x10EFD02F', mute: '0x10EFF00F',
+          chUp: '0x10EF48B7', chDown: '0x10EF08F7', up: '0x10EF06F9', down: '0x10EF8679', left: '0x10EFA659', right: '0x10EF46B9',
+          ok: '0x10EF16E9', back: '0x10EF1AE5', home: '0x10EF9E61', menu: '0x10EF58A7', exit: '0x10EFB44B',
+          num0: '0x10EF8877', num1: '0x10EF20DF', num2: '0x10EFA05F', num3: '0x10EF609F', num4: '0x10EF10EF',
+          num5: '0x10EF906F', num6: '0x10EF50AF', num7: '0x10EF30CF', num8: '0x10EFB04F', num9: '0x10EF708F'
+        }
+      },
+      dell_monitor: {
+        name: 'Dell / Alienware Monitor',
+        protocol: 'nec',
+        freq: 38000,
+        codes: {
+          power: '0x40BF02FD', source: '0x40BF807F', volUp: '0x40BFE01F', volDown: '0x40BFD02F', mute: '0x40BFF00F',
+          chUp: '0x40BF48B7', chDown: '0x40BF08F7', up: '0x40BF06F9', down: '0x40BF8679', left: '0x40BFA659', right: '0x40BF46B9',
+          ok: '0x40BF16E9', back: '0x40BF1AE5', home: '0x40BF9E61', menu: '0x40BF58A7', exit: '0x40BFB44B',
+          num0: '0x40BF8877', num1: '0x40BF20DF', num2: '0x40BFA05F', num3: '0x40BF609F', num4: '0x40BF10EF',
+          num5: '0x40BF906F', num6: '0x40BF50AF', num7: '0x40BF30CF', num8: '0x40BFB04F', num9: '0x40BF708F'
+        }
+      },
+      benq_monitor: {
+        name: 'BenQ Monitor (Mobiuz / Zowie)',
+        protocol: 'nec',
+        freq: 38000,
+        codes: {
+          power: '0x01FE02FD', source: '0x01FE8877', volUp: '0x01FE58A7', volDown: '0x01FE7887', mute: '0x01FE18E7',
+          chUp: '0x01FE48B7', chDown: '0x01FE6897', up: '0x01FEA857', down: '0x01FE9867', left: '0x01FEE817', right: '0x01FEC837',
+          ok: '0x01FE08F7', back: '0x01FEB847', home: '0x01FE38C7', menu: '0x01FE28D7', exit: '0x01FED827',
+          num0: '0x01FE00FF', num1: '0x01FE807F', num2: '0x01FE40BF', num3: '0x01FEC03F', num4: '0x01FE20DF',
+          num5: '0x01FEA05F', num6: '0x01FE609F', num7: '0x01FEE01F', num8: '0x01FE10EF', num9: '0x01FE906F'
+        }
+      },
+      acer_monitor: {
+        name: 'Acer Monitor (Predator / Nitro)',
+        protocol: 'nec',
+        freq: 38000,
+        codes: {
+          power: '0x02FD02FD', source: '0x02FD38C7', volUp: '0x02FD58A7', volDown: '0x02FD7887', mute: '0x02FD08F7',
+          chUp: '0x02FD18E7', chDown: '0x02FD28D7', up: '0x02FD8877', down: '0x02FD9867', left: '0x02FDA857', right: '0x02FDB847',
+          ok: '0x02FDC837', back: '0x02FDE817', home: '0x02FDD827', menu: '0x02FDF807', exit: '0x02FDE817',
+          num0: '0x02FD00FF', num1: '0x02FD807F', num2: '0x02FD40BF', num3: '0x02FDC03F', num4: '0x02FD20DF',
+          num5: '0x02FDA05F', num6: '0x02FD609F', num7: '0x02FDE01F', num8: '0x02FD10EF', num9: '0x02FD906F'
+        }
+      },
+      monitor: {
+        name: 'Monitor PC (Samsung/LG/AOC)',
+        protocol: 'samsung_nec',
+        freq: 38000,
+        codes: {
+          power: '0xE0E040BF', source: '0xE0E0807F', volUp: '0xE0E0E01F', volDown: '0xE0E0D02F', mute: '0xE0E0F00F',
+          chUp: '0xE0E048B7', chDown: '0xE0E008F7', up: '0xE0E006F9', down: '0xE0E08679', left: '0xE0E0A659', right: '0xE0E046B9',
+          ok: '0xE0E016E9', back: '0xE0E01AE5', home: '0xE0E09E61', menu: '0xE0E058A7', exit: '0xE0E0B44B',
+          num0: '0xE0E08877', num1: '0xE0E020DF', num2: '0xE0E0A05F', num3: '0xE0E0609F', num4: '0xE0E010EF',
+          num5: '0xE0E0906F', num6: '0xE0E050AF', num7: '0xE0E030CF', num8: '0xE0E0B04F', num9: '0xE0E0708F'
+        }
+      }
+    };
+
+    let activeBrandKey = 'samsung';
+    let soundEnabled = true;
+
+    // Pulse generators (LSB-first per byte sesuai standar resmi NEC / Renesas)
+    function hexToNecRaw(hex, isSamsung) {
+      const num = parseInt(hex.replace(/^0x/i, ''), 16);
+      const hdrMark = isSamsung ? 4500 : 9000;
+      const p = [hdrMark, 4500];
+      for (let byteIdx = 0; byteIdx < 4; byteIdx++) {
+        const shift = (3 - byteIdx) * 8;
+        const byteVal = (num >>> shift) & 0xff;
+        for (let bitIdx = 0; bitIdx < 8; bitIdx++) {
+          const bit = (byteVal >>> bitIdx) & 1;
+          p.push(560);
+          p.push(bit === 1 ? 1690 : 560);
+        }
+      }
+      p.push(560);
+      return p.join(',');
+    }
+
+    function hexToSonyRaw(hex) {
+      const num = parseInt(hex.replace(/^0x/i, ''), 16);
+      const p = [2400, 600];
+      const bits = hex.length > 5 ? 15 : 12;
+      for (let i = 0; i < bits; i++) {
+        const bit = (num >>> i) & 1;
+        p.push(bit === 1 ? 1200 : 600);
+        if (i < bits - 1) p.push(600);
+      }
+      return p.join(',');
+    }
+
+    function getRawPattern(brandKey, hex) {
+      const b = BRAND_DB[brandKey];
+      if (b.protocol === 'samsung_nec') return hexToNecRaw(hex, true);
+      if (b.protocol === 'sony_sirc') return hexToSonyRaw(hex);
+      return hexToNecRaw(hex, false);
+    }
+
+    // Audio Click
+    let audioCtx = null;
+    function playBeep(type) {
+      if (!soundEnabled) return;
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        const now = audioCtx.currentTime;
+        osc.frequency.setValueAtTime(type === 'power' ? 440 : 700, now);
+        osc.frequency.exponentialRampToValueAtTime(300, now + 0.04);
+        gain.gain.setValueAtTime(0.04, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+        osc.start(now);
+        osc.stop(now + 0.04);
+      } catch (e) {}
+    }
+
+    // Log & Flash
+    function addLog(msg) {
+      const time = new Date().toLocaleTimeString('id-ID', { hour12: false });
+      const stream = document.getElementById('logStream');
+      stream.innerHTML = `[${time}] ${msg}<br/>` + stream.innerHTML;
+    }
+
+    function flashBulb() {
+      const b = document.getElementById('irBulb');
+      b.classList.add('transmitting');
+      setTimeout(() => b.classList.remove('transmitting'), 120);
+    }
+
+    // Transmit execution
+    function transmitCommand(cmdKey, label) {
+      const b = BRAND_DB[activeBrandKey];
+      const hex = b.codes[cmdKey];
+      if (!hex) return;
+
+      if (navigator.vibrate) navigator.vibrate(30);
+      playBeep(cmdKey === 'power' ? 'power' : 'click');
+      flashBulb();
+
+      const raw = getRawPattern(activeBrandKey, hex);
+      const hasBridge = typeof window.AndroidIR?.transmitIR === 'function';
+
+      if (hasBridge) {
+        window.AndroidIR.transmitIR(b.freq, raw);
+        addLog(`📡 [IR] ${b.name}: ${label} (${hex}) @ ${b.freq/1000}kHz`);
+      } else {
+        addLog(`⚡ [SIMULASI] ${b.name}: ${label} (${hex})`);
+      }
+    }
+
+    /* ============================================================
+       EVENT BINDINGS
+       ============================================================ */
+    // Brand Change
+    document.getElementById('brandSelect').addEventListener('change', (e) => {
+      activeBrandKey = e.target.value;
+      const b = BRAND_DB[activeBrandKey];
+      document.getElementById('carrierBadge').innerText = `${b.freq / 1000} kHz`;
+      addLog(`Perangkat diganti: ${b.name} (${b.freq/1000} kHz)`);
+    });
+
+    // Sound toggle
+    document.getElementById('btnSoundToggle').addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      document.getElementById('btnSoundToggle').innerText = soundEnabled ? '🔊' : '🔇';
+    });
+
+    // Tab Switching
+    const tabs = {
+      tabRemote: 'panelRemote',
+      tabKeyboard: 'panelKeyboard',
+      tabNumpad: 'panelNumpad'
+    };
+
+    Object.keys(tabs).forEach(tId => {
+      document.getElementById(tId).addEventListener('click', () => {
+        Object.keys(tabs).forEach(k => {
+          document.getElementById(k).classList.remove('active');
+          document.getElementById(tabs[k]).classList.remove('active');
+        });
+        document.getElementById(tId).classList.add('active');
+        document.getElementById(tabs[tId]).classList.add('active');
+      });
+    });
+
+    document.getElementById('btnQuickQwerty').addEventListener('click', () => {
+      document.getElementById('tabKeyboard').click();
+    });
+
+    // Remote buttons
+    const bindBtn = (id, cmdKey, label) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('click', () => transmitCommand(cmdKey, label));
+    };
+
+    bindBtn('btnPower', 'power', 'Power');
+    bindBtn('btnSource', 'source', 'Source');
+    bindBtn('btnMenu', 'menu', 'Menu');
+    bindBtn('btnUp', 'up', 'Up');
+    bindBtn('btnDown', 'down', 'Down');
+    bindBtn('btnLeft', 'left', 'Left');
+    bindBtn('btnRight', 'right', 'Right');
+    bindBtn('btnOk', 'ok', 'OK');
+    bindBtn('btnBack', 'back', 'Back');
+    bindBtn('btnHome', 'home', 'Home');
+    bindBtn('btnExit', 'exit', 'Exit');
+    bindBtn('btnVolUp', 'volUp', 'Vol +');
+    bindBtn('btnVolDown', 'volDown', 'Vol -');
+    bindBtn('btnMute', 'mute', 'Mute');
+    bindBtn('btnChUp', 'chUp', 'Ch +');
+    bindBtn('btnChDown', 'chDown', 'Ch -');
+
+    // Thumb controls in keyboard
+    bindBtn('btnThumbLeft', 'left', 'Left');
+    bindBtn('btnThumbUp', 'up', 'Up');
+    bindBtn('btnThumbDown', 'down', 'Down');
+    bindBtn('btnThumbRight', 'right', 'Right');
+    bindBtn('btnThumbOk', 'ok', 'OK');
+    bindBtn('btnThumbBack', 'back', 'Back');
+
+    // Numpad buttons
+    document.querySelectorAll('.btn-num[data-num]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const n = btn.getAttribute('data-num');
+        transmitCommand(`num${n}`, `Angka ${n}`);
+      });
+    });
+    bindBtn('btnNumpadSrc', 'source', 'Source');
+    bindBtn('btnNumpadBack', 'back', 'Back');
+
+    /* ============================================================
+       QWERTY KEYBOARD & AUTO-TYPIST
+       ============================================================ */
+    const typeInput = document.getElementById('typeInput');
+    const chkDirectKey = document.getElementById('chkDirectKey');
+
+    // YouTube on-screen keyboard grid
+    const YT_GRID = [
+      ['A','B','C','D','E','F'],
+      ['G','H','I','J','K','L'],
+      ['M','N','O','P','Q','R'],
+      ['S','T','U','V','W','X'],
+      ['Y','Z','1','2','3','4'],
+      ['5','6','7','8','9','0'],
+      ['CLR',' ',' ',' ','BKSP','SEARCH']
+    ];
+
+    let cursorRow = 0;
+    let cursorCol = 0;
+
+    function findGridPos(char) {
+      const up = char.toUpperCase();
+      if (up === ' ') return { r: 6, c: 1 };
+      for (let r = 0; r < YT_GRID.length; r++) {
+        for (let c = 0; c < YT_GRID[r].length; c++) {
+          if (YT_GRID[r][c] === up) return { r, c };
+        }
+      }
+      return null;
+    }
+
+    async function sendCharAuto(char) {
+      const pos = findGridPos(char);
+      if (!pos) return;
+
+      const dy = pos.r - cursorRow;
+      const dx = pos.c - cursorCol;
+
+      // Vertikal
+      if (dy > 0) {
+        for (let i = 0; i < dy; i++) {
+          transmitCommand('down', 'Down');
+          await new Promise(r => setTimeout(r, 180));
+        }
+      } else if (dy < 0) {
+        for (let i = 0; i < Math.abs(dy); i++) {
+          transmitCommand('up', 'Up');
+          await new Promise(r => setTimeout(r, 180));
+        }
+      }
+
+      // Horizontal
+      if (dx > 0) {
+        for (let i = 0; i < dx; i++) {
+          transmitCommand('right', 'Right');
+          await new Promise(r => setTimeout(r, 180));
+        }
+      } else if (dx < 0) {
+        for (let i = 0; i < Math.abs(dx); i++) {
+          transmitCommand('left', 'Left');
+          await new Promise(r => setTimeout(r, 180));
+        }
+      }
+
+      // OK
+      transmitCommand('ok', 'OK');
+      await new Promise(r => setTimeout(r, 180));
+
+      cursorRow = pos.r;
+      cursorCol = pos.c;
+    }
+
+    // Single Key Click
+    document.querySelectorAll('.key-btn[data-k]').forEach(b => {
+      b.addEventListener('click', () => {
+        const k = b.getAttribute('data-k');
+        typeInput.value += k;
+        if (chkDirectKey.checked) {
+          sendCharAuto(k);
+        }
+      });
+    });
+
+    document.getElementById('btnSpace').addEventListener('click', () => {
+      typeInput.value += ' ';
+      if (chkDirectKey.checked) sendCharAuto(' ');
+    });
+
+    document.getElementById('btnBackspace').addEventListener('click', () => {
+      typeInput.value = typeInput.value.slice(0, -1);
+      transmitCommand('back', 'Backspace');
+    });
+
+    document.getElementById('btnEnter').addEventListener('click', () => {
+      transmitCommand('ok', 'Enter / Search');
+    });
+
+    // Chips Click
+    document.querySelectorAll('.chip-btn[data-val]').forEach(c => {
+      c.addEventListener('click', () => {
+        typeInput.value += c.getAttribute('data-val');
+      });
+    });
+
+    // Auto-Type Button
+    document.getElementById('btnAutoType').addEventListener('click', async () => {
+      const text = typeInput.value;
+      if (!text) return;
+      addLog(`🚀 Memulai auto-type: "${text}"...`);
+      for (const char of text) {
+        await sendCharAuto(char);
+      }
+      addLog(`✅ Selesai mengetik: "${text}"`);
+    });
+
+    // Speech-to-Text
+    const btnVoice = document.getElementById('btnVoice');
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recog = new SpeechRecognition();
+      recog.lang = 'id-ID';
+      recog.onstart = () => btnVoice.classList.add('listening');
+      recog.onresult = (e) => {
+        typeInput.value = e.results[0][0].transcript;
+        addLog(`Suara: "${typeInput.value}"`);
+      };
+      recog.onend = () => btnVoice.classList.remove('listening');
+      recog.onerror = () => btnVoice.classList.remove('listening');
+
+      btnVoice.addEventListener('click', () => recog.start());
+    } else {
+      btnVoice.style.opacity = '0.4';
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.PocoIRRemote" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:statusBarColor">#07090E</item>
+        <item name="android:navigationBarColor">#07090E</item>
+        <item name="android:windowBackground">@color/bg_dark</item>
+    </style>
+</resources>
