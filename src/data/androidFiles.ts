@@ -18,8 +18,14 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 
 /**
- * MainActivity untuk membungkus antarmuka web Samsung Remote
- * dan menghubungkannya dengan sensor IR Blaster bawaan Poco X7 Pro via ConsumerIrManager.
+ * MainActivity untuk membungkus antarmuka web Multi-Brand Universal IR Remote & QWERTY Keyboard
+ * dan menghubungkannya dengan modul IR Blaster fisik Poco / Xiaomi via ConsumerIrManager.
+ *
+ * Kompatibel dengan:
+ * - Poco X3, X4, X5, X6, X7 Pro
+ * - Poco F3, F4, F5, F6 Pro
+ * - Xiaomi Mi 10, 11, 12, 13, 14
+ * - Redmi Note Series (dengan IR Blaster)
  */
 class MainActivity : AppCompatActivity() {
 
@@ -27,7 +33,7 @@ class MainActivity : AppCompatActivity() {
     private var irManager: ConsumerIrManager? = null
 
     companion object {
-        private const val TAG = "PocoIRRemote"
+        private const val TAG = "PocoUniversalIR"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,7 +43,7 @@ class MainActivity : AppCompatActivity() {
         // Inisialisasi ConsumerIrManager dari sistem Android
         irManager = getSystemService(Context.CONSUMER_IR_SERVICE) as? ConsumerIrManager
 
-        // Verifikasi keberadaan modul IR Emitter fisik
+        // Verifikasi keberadaan modul IR Blaster fisik
         if (irManager == null || !irManager!!.hasIrEmitter()) {
             Log.w(TAG, "Device ini tidak mendeteksi hardware IR Blaster!")
             Toast.makeText(
@@ -46,14 +52,14 @@ class MainActivity : AppCompatActivity() {
                 Toast.LENGTH_LONG
             ).show()
         } else {
-            Log.i(TAG, "IR Blaster hardware siap digunakan.")
+            Log.i(TAG, "Hardware IR Blaster Poco/Xiaomi siap digunakan.")
         }
 
         // Setup WebView
         webView = findViewById(R.id.webView)
         setupWebView()
 
-        // Muat file antarmuka web dari folder assets
+        // Muat antarmuka dari assets/index.html
         webView.loadUrl("file:///android_asset/index.html")
     }
 
@@ -70,7 +76,7 @@ class MainActivity : AppCompatActivity() {
             cacheMode = WebSettings.LOAD_NO_CACHE
         }
 
-        // Hilangkan background default agar menyatu dengan Glassmorphism
+        // Background gelap OLED sesuai tema Poco
         webView.setBackgroundColor(0xFF07090E.toInt())
         webView.isVerticalScrollBarEnabled = false
         webView.isHorizontalScrollBarEnabled = false
@@ -81,13 +87,13 @@ class MainActivity : AppCompatActivity() {
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
-                Log.d(TAG, "Halaman Web Remote berhasil dimuat.")
+                Log.d(TAG, "Remote Universal Web UI berhasil dimuat.")
             }
         }
     }
 
     /**
-     * Interface jembatan antara JavaScript dan Android Native
+     * Interface jembatan antara JavaScript dan Hardware Android Native
      */
     class AndroidIRBridge(
         private val context: Context,
@@ -103,16 +109,16 @@ class MainActivity : AppCompatActivity() {
         }
 
         /**
-         * Mengirimkan sinyal IR ke TV Samsung
-         * @param frequency Frekuensi carrier (38000 Hz untuk Samsung)
-         * @param patternString Deretan mikrodetik dipisahkan koma (contoh: "4500,4500,560,1690,...")
-         * @return true jika berhasil dieksekusi oleh hardware
+         * Mengirimkan sinyal IR ke TV atau Monitor dengan frekuensi carrier yang ditentukan:
+         * @param frequency Frekuensi carrier dalam Hz (contoh: 38000 Hz untuk Samsung/LG/Xiaomi/TCL, 40000 Hz untuk Sony, 37000 Hz untuk Panasonic)
+         * @param patternString Pola durasi pulsa mikrodetik dipisahkan koma (contoh: "9000,4500,560,1690,...")
+         * @return true jika transmisi berhasil dieksekusi oleh driver hardware
          */
         @JavascriptInterface
         fun transmitIR(frequency: Int, patternString: String): Boolean {
             return try {
                 if (irManager == null || !irManager.hasIrEmitter()) {
-                    Log.e(TAG, "Gagal transmit: Hardware IR tidak tersedia.")
+                    Log.e(TAG, "Gagal transmit: Hardware IR Blaster tidak tersedia.")
                     return false
                 }
 
@@ -121,18 +127,18 @@ class MainActivity : AppCompatActivity() {
                     .map { it.trim().toInt() }
                     .toIntArray()
 
-                // Eksekusi transmisi melalui driver ConsumerIrManager Android
+                // Transmisi via Android ConsumerIrManager
                 irManager.transmit(frequency, pattern)
-                Log.d(TAG, "Transmit IR sukses: freq=$frequency Hz, pulsa=\${pattern.size} elemen.")
+                Log.d(TAG, "Transmit IR sukses: freq=\${frequency} Hz, pulsa=\${pattern.size} elemen.")
                 true
             } catch (e: Exception) {
-                Log.e(TAG, "Kesalahan saat transmit IR: \${e.message}", e)
+                Log.e(TAG, "Kesalahan saat transmisi IR: \${e.message}", e)
                 false
             }
         }
 
         /**
-         * Tambahan: Haptic feedback native Android jika diperlukan
+         * Haptic feedback getar native saat tombol ditekan
          */
         @JavascriptInterface
         fun triggerHaptic(durationMs: Long) {
@@ -168,13 +174,13 @@ class MainActivity : AppCompatActivity() {
     xmlns:tools="http://schemas.android.com/tools"
     package="com.example.pocoirremote">
 
-    <!-- Izin wajib untuk mengakses sensor transmisi IR Blaster -->
+    <!-- Izin wajib untuk mengakses transmisi IR Blaster HP Poco / Xiaomi -->
     <uses-permission android:name="android.permission.TRANSMIT_IR" />
 
-    <!-- Izin getar untuk haptic feedback -->
+    <!-- Izin getar haptic feedback tombol -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
-    <!-- Deklarasi hardware IR Blaster (required=false agar tidak memblokir instalasi saat debugging) -->
+    <!-- Fitur hardware IR Blaster (required=false agar tidak memblokir saat di-debug di emulator) -->
     <uses-feature
         android:name="android.hardware.consumerir"
         android:required="false" />
@@ -184,7 +190,7 @@ class MainActivity : AppCompatActivity() {
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
-        android:label="Poco IR Remote"
+        android:label="Poco Universal IR Remote"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.NoActionBar"
@@ -206,20 +212,16 @@ class MainActivity : AppCompatActivity() {
 </manifest>`,
 
   activityMainXml: `<?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout 
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#07090E"
-    tools:context=".MainActivity">
+    android:background="#07090E">
 
     <WebView
         android:id="@+id/webView"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:overScrollMode="never"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -227,28 +229,16 @@ class MainActivity : AppCompatActivity() {
 
 </androidx.constraintlayout.widget.ConstraintLayout>`,
 
-  setupGuide: `# Panduan Langkah-demi-Langkah Android Studio (Poco X7 Pro)
+  setupGuide: `# Panduan Kompilasi APK di Android Studio (Poco / Xiaomi IR)
 
-### 1. Struktur Folder Project di Android Studio
-Letakkan file yang telah dibuat sesuai direktori berikut:
-\`\`\`text
-PocoIRRemote/
-├── app/
-│   ├── src/
-│   │   ├── main/
-│   │   │   ├── assets/
-│   │   │   │   └── index.html               <-- Paste Single-File index.html di sini
-│   │   │   ├── java/com/example/pocoirremote/
-│   │   │   │   └── MainActivity.kt          <-- Paste kode MainActivity.kt
-│   │   │   ├── res/
-│   │   │   │   └── layout/
-│   │   │   │       └── activity_main.xml    <-- Paste layout WebView
-│   │   │   └── AndroidManifest.xml          <-- Paste kode Manifest
-\`\`\`
-
-### 2. Catatan Khusus Xiaomi HyperOS / Poco X7 Pro
-1. **Sensor IR Blaster:** Poco X7 Pro dilengkapi dengan IR Blaster hardware di sisi atas bezel ponsel.
-2. **Izin Sistem:** ConsumerIrManager tidak memerlukan runtime prompt permission di Android 14/15, cukup izin deklarasi \`<uses-permission android:name="android.permission.TRANSMIT_IR" />\` di \`AndroidManifest.xml\`.
-3. **Optimasi Baterai HyperOS:** Pada beberapa ROM MIUI/HyperOS, pastikan aplikasi tidak dibatasi oleh "Battery Saver" ketat agar thread transmisi IR tidak di-kill saat di latar belakang.
-4. **Jarak Transmisi:** Sudut pancaran IR Blaster smartphone efektif pada rentang 1-7 meter lurus mengarah ke receiver IR di bawah bezel TV Samsung.`
+1. Buat project baru di Android Studio ("Empty Views Activity").
+2. Salin isi MainActivity.kt ke: \`app/src/main/java/com/example/pocoirremote/MainActivity.kt\`.
+3. Salin isi AndroidManifest.xml ke: \`app/src/main/AndroidManifest.xml\`.
+4. Salin file \`activity_main.xml\` ke: \`app/src/main/res/layout/activity_main.xml\`.
+5. Buat folder assets: \`app/src/main/assets/\`.
+6. Download file \`index.html\` dari tombol Download di aplikasi ini, lalu letakkan di:
+   \`app/src/main/assets/index.html\`.
+7. Hubungkan HP Poco atau Xiaomi melalui USB Debugging, lalu klik "Run 'app'" (Shift + F10).
+8. Aplikasi akan langsung mengenali sensor IR Blaster fisik Poco dan dapat mengendalikan Smart TV Samsung, LG, Sony, Xiaomi, Polytron, TCL, Sharp, dll.!
+`
 };

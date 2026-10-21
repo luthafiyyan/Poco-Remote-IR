@@ -1,13 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import {
-  hexToSamsungRaw,
-  analyzeSamsungNec,
+  BrandProfile,
+  IrPulseAnalysis,
+  TvState,
+} from './types/ir';
+import { BRANDS, DEFAULT_BRAND_ID } from './data/brands';
+import {
+  generateRawIrPattern,
+  analyzeIrPulse,
   playTactileClick,
-  IR_CARRIER_FREQ,
-  SAMSUNG_COMMANDS
-} from './utils/samsungIr';
-import { STANDALONE_HTML_CODE } from './data/standaloneHtmlString';
+} from './utils/irProtocols';
+import { BrandSelectorModal } from './components/BrandSelectorModal';
+import { QwertyTypingPanel } from './components/QwertyTypingPanel';
+import { OscilloscopeModal } from './components/OscilloscopeModal';
+import { VirtualTv } from './components/VirtualTv';
 import { ANDROID_FILES } from './data/androidFiles';
+import { STANDALONE_HTML_CODE } from './data/standaloneHtmlString';
 import {
   Power,
   Tv,
@@ -21,7 +29,6 @@ import {
   X,
   Volume2,
   VolumeX,
-  Radio,
   Keyboard,
   Play,
   Pause,
@@ -32,43 +39,119 @@ import {
   Copy,
   Check,
   Code2,
-  Sparkles
+  Activity,
+  Sliders,
+  Sparkles,
+  Layers,
+  Monitor,
+  Radio,
+  Maximize2,
+  Smartphone
 } from 'lucide-react';
 
 export default function App() {
-  // Bridge simulation
+  // Brand selection
+  const [activeBrandId, setActiveBrandId] = useState<string>(DEFAULT_BRAND_ID);
+  const activeBrand: BrandProfile = BRANDS[activeBrandId] || BRANDS[DEFAULT_BRAND_ID];
+
+  // Active view tab: 'remote' | 'keyboard' | 'numpad' | 'tv'
+  const [activeTab, setActiveTab] = useState<'remote' | 'keyboard' | 'numpad' | 'tv'>('remote');
+
+  // Modals
+  const [isBrandModalOpen, setIsBrandModalOpen] = useState(false);
+  const [isOscilloscopeOpen, setIsOscilloscopeOpen] = useState(false);
+  const [isAndroidCodeModalOpen, setIsAndroidCodeModalOpen] = useState(false);
+  const [isLogOpen, setIsLogOpen] = useState(false);
+
+  // Hardware feedback
   const [isSimulatingBridge, setIsSimulatingBridge] = useState(true);
   const [isTransmitting, setIsTransmitting] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [lastCommand, setLastCommand] = useState<{ name: string; hex: string } | null>(null);
+  const [lastCommand, setLastCommand] = useState<{ name: string; hex: string; freq: number } | null>(null);
+  const [currentAnalysis, setCurrentAnalysis] = useState<IrPulseAnalysis | null>(null);
 
-  // Drawers
-  const [isQwertyOpen, setIsQwertyOpen] = useState(false);
-  const [isNumpadOpen, setIsNumpadOpen] = useState(false);
-  const [isLogOpen, setIsLogOpen] = useState(false);
-  const [isAndroidCodeModalOpen, setIsAndroidCodeModalOpen] = useState(false);
+  // TV State Simulation
+  const [tvState, setTvState] = useState<TvState>({
+    isPowered: true,
+    volume: 18,
+    isMuted: false,
+    channel: 2, // YouTube UHD
+    source: 'TV',
+    isSmartHubOpen: false,
+    isMenuOpen: false,
+    selectedAppIndex: 0,
+    notification: null,
+    activeBrandId: DEFAULT_BRAND_ID,
+    searchQuery: '',
+    cursorRow: 0,
+    cursorCol: 0,
+  });
 
-  // YouTube QWERTY state
-  const [ytSearchText, setYtSearchText] = useState('');
-  const [copiedCodeKey, setCopiedCodeKey] = useState<string | null>(null);
+  // Android Studio code tabs
   const [activeCodeTab, setActiveCodeTab] = useState<'html' | 'kotlin' | 'manifest'>('html');
+  const [copiedCodeKey, setCopiedCodeKey] = useState<string | null>(null);
 
   // Logs stream
   const [logs, setLogs] = useState<string[]>([
-    `[READY] Remote Samsung Smart TV siap pada carrier 38 kHz (Poco X7 Pro).`
+    `[READY] Poco Universal IR Remote aktif. Carrier: ${activeBrand.frequency / 1000} kHz (${activeBrand.name}).`
   ]);
 
   // Toast
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
+  // PWA Installation
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
+  const [isStandalone, setIsStandalone] = useState(false);
+
+  useEffect(() => {
+    // Deteksi jika sudah berjalan dalam mode standalone PWA
+    if (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone) {
+      setIsStandalone(true);
+    }
+
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setDeferredInstallPrompt(e);
+      addLog('[PWA] Event beforeinstallprompt siap. Tombol Instal aktif.');
+    };
+
+    const handleAppInstalled = () => {
+      setIsStandalone(true);
+      setDeferredInstallPrompt(null);
+      showToast('🎉 Aplikasi Poco Remote berhasil diinstal!');
+      addLog('[PWA] Aplikasi berhasil dipasang di layar utama.');
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (deferredInstallPrompt) {
+      deferredInstallPrompt.prompt();
+      const choice = await deferredInstallPrompt.userChoice;
+      if (choice.outcome === 'accepted') {
+        showToast('Menginstal aplikasi ke layar utama...');
+      }
+      setDeferredInstallPrompt(null);
+    } else {
+      showToast('Buka menu browser (⋮) lalu pilih "Instal Aplikasi" / "Tambahkan ke Layar Utama"');
+    }
+  };
+
   useEffect(() => {
     if (isSimulatingBridge) {
-      (window as unknown as { AndroidIR?: unknown }).AndroidIR = {
+      (window as any).AndroidIR = {
         hasIrEmitter: () => true,
         transmitIR: (_freq: number, _pattern: string) => true,
       };
     } else {
-      delete (window as unknown as { AndroidIR?: unknown }).AndroidIR;
+      delete (window as any).AndroidIR;
     }
   }, [isSimulatingBridge]);
 
@@ -83,12 +166,12 @@ export default function App() {
   };
 
   /**
-   * Main Transmit function
+   * Main Transmit function: supports any brand & frequency
    */
   const handleTransmit = (hex: string, name: string) => {
     // 1. Haptic feedback
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
-      navigator.vibrate(40);
+      navigator.vibrate(35);
     }
 
     // 2. Sound click
@@ -98,32 +181,76 @@ export default function App() {
       playTactileClick(isPower ? 'power' : isNav ? 'nav' : 'click');
     }
 
-    // 3. Hardware IR diode flash
+    // 3. Hardware IR diode pulse animation
     setIsTransmitting(true);
-    setTimeout(() => setIsTransmitting(false), 140);
+    setTimeout(() => setIsTransmitting(false), 130);
 
-    // 4. NECx2 encoding
-    const rawPattern = hexToSamsungRaw(hex);
-    const pulseCount = rawPattern.split(',').length;
-    setLastCommand({ name, hex });
+    // 4. Generate pulse sequence according to active brand & protocol
+    const dummyCmd = { id: name, name, hex, category: 'nav' as const };
+    const { rawPattern, frequency, pulseCount } = generateRawIrPattern(activeBrand, dummyCmd);
 
-    // 5. Native bridge or browser simulation
-    const hasBridge = typeof (window as unknown as { AndroidIR?: { transmitIR?: Function } }).AndroidIR?.transmitIR === 'function';
+    setLastCommand({ name, hex, freq: frequency });
+
+    // Store analysis for Oscilloscope
+    const analysis = analyzeIrPulse(hex, activeBrand, name);
+    setCurrentAnalysis(analysis);
+
+    // 5. Update Virtual TV state if applicable
+    updateTvStateForCommand(name);
+
+    // 6. Transmit via native Android ConsumerIrManager or browser simulation
+    const hasBridge = typeof (window as any).AndroidIR?.transmitIR === 'function';
     if (hasBridge) {
       try {
-        (window as unknown as { AndroidIR: { transmitIR: (f: number, p: string) => boolean } }).AndroidIR.transmitIR(
-          IR_CARRIER_FREQ,
-          rawPattern
-        );
-        showToast(`📡 [IR] ${name}`);
-        addLog(`[TRANSMIT-OK] ${name} (${hex}) -> 38kHz, ${pulseCount} pulsa terkirim via ConsumerIrManager.`);
-      } catch (err: unknown) {
-        showToast(`⚠️ Gagal: ${(err as Error).message}`);
-        addLog(`[ERROR] ${(err as Error).message}`);
+        (window as any).AndroidIR.transmitIR(frequency, rawPattern);
+        showToast(`📡 [${activeBrand.shortName}] ${name}`);
+        addLog(`[IR-OK] ${activeBrand.shortName} | ${name} (${hex}) -> ${frequency / 1000}kHz, ${pulseCount} pulsa.`);
+      } catch (err: any) {
+        showToast(`⚠️ Transmit Error: ${err.message}`);
+        addLog(`[ERROR] ${err.message}`);
       }
     } else {
-      showToast(`⚡ [SIMULASI] ${name}`);
-      addLog(`[SIMULASI] ${name} | HEX: ${hex} | Pulsa: ${pulseCount} elemen.`);
+      showToast(`⚡ [SIMULASI ${activeBrand.shortName}] ${name}`);
+      addLog(`[SIMULASI] ${activeBrand.shortName} | ${name} (${hex}) -> ${frequency / 1000}kHz, ${pulseCount} pulsa.`);
+    }
+  };
+
+  /**
+   * Update virtual TV simulation
+   */
+  const updateTvStateForCommand = (cmdName: string) => {
+    const lower = cmdName.toLowerCase();
+
+    if (lower.includes('power')) {
+      setTvState(prev => ({ ...prev, isPowered: !prev.isPowered }));
+    } else if (lower.includes('vol') && lower.includes('+')) {
+      setTvState(prev => ({ ...prev, volume: Math.min(100, prev.volume + 2), isMuted: false }));
+    } else if (lower.includes('vol') && (lower.includes('-') || lower.includes('down'))) {
+      setTvState(prev => ({ ...prev, volume: Math.max(0, prev.volume - 2), isMuted: false }));
+    } else if (lower.includes('mute')) {
+      setTvState(prev => ({ ...prev, isMuted: !prev.isMuted }));
+    } else if (lower.includes('ch') && lower.includes('+')) {
+      setTvState(prev => ({ ...prev, channel: (prev.channel % 9) + 1 }));
+    } else if (lower.includes('ch') && (lower.includes('-') || lower.includes('down'))) {
+      setTvState(prev => ({ ...prev, channel: prev.channel <= 1 ? 9 : prev.channel - 1 }));
+    } else if (lower.includes('home')) {
+      setTvState(prev => ({ ...prev, isSmartHubOpen: !prev.isSmartHubOpen }));
+    } else if (lower.includes('menu')) {
+      setTvState(prev => ({ ...prev, isMenuOpen: !prev.isMenuOpen }));
+    } else if (lower.includes('source') || lower.includes('input')) {
+      const sources = ['TV', 'HDMI 1', 'HDMI 2', 'USB', 'AV'];
+      setTvState(prev => {
+        const nextIdx = (sources.indexOf(prev.source) + 1) % sources.length;
+        return { ...prev, source: sources[nextIdx] };
+      });
+    } else if (lower.includes('up')) {
+      setTvState(prev => ({ ...prev, cursorRow: Math.max(0, prev.cursorRow - 1) }));
+    } else if (lower.includes('down')) {
+      setTvState(prev => ({ ...prev, cursorRow: Math.min(5, prev.cursorRow + 1) }));
+    } else if (lower.includes('left')) {
+      setTvState(prev => ({ ...prev, cursorCol: Math.max(0, prev.cursorCol - 1) }));
+    } else if (lower.includes('right')) {
+      setTvState(prev => ({ ...prev, cursorCol: Math.min(5, prev.cursorCol + 1) }));
     }
   };
 
@@ -137,7 +264,7 @@ export default function App() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    showToast('Download index.html berhasil');
+    showToast('Download standalone index.html berhasil');
   };
 
   const handleCopyCode = (code: string, key: string) => {
@@ -147,541 +274,588 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#07090e] text-slate-100 flex flex-col items-center justify-center p-2 sm:p-4 select-none relative overflow-x-hidden font-sans">
+    <div className="min-h-screen bg-[#07090e] text-slate-100 flex flex-col items-center justify-start p-2 sm:p-4 select-none relative overflow-x-hidden font-sans">
       
       {/* Toast Notification */}
       {toastMsg && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full text-xs font-semibold bg-slate-900/95 backdrop-blur-xl border border-white/20 text-white shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-top-4 duration-200">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full text-xs font-semibold bg-slate-900/95 backdrop-blur-xl border border-amber-400/40 text-amber-300 shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-top-4 duration-150">
+          <span className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_#fbbf24]" />
           <span>{toastMsg}</span>
         </div>
       )}
 
-      {/* Floating Action Button for Android Studio Source Code Modal */}
-      <div className="fixed top-3 right-3 z-40 flex items-center gap-2">
+      {/* Top Floating Action Buttons (PWA Install, Oscilloscope, Android Code, Download) */}
+      <div className="fixed top-2.5 right-2.5 z-40 flex items-center gap-1.5">
+        {!isStandalone && (
+          <button
+            onClick={handleInstallClick}
+            className="p-1.5 px-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 active:scale-95 text-black font-extrabold transition-all shadow-md shadow-amber-400/25 flex items-center gap-1.5 text-xs cursor-pointer animate-in fade-in"
+            title="Instal aplikasi ini ke layar utama HP Poco / Android"
+          >
+            <Smartphone className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span>Instal App</span>
+          </button>
+        )}
+
         <button
-          onClick={handleDownloadHtml}
-          className="p-2 rounded-xl bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 text-slate-300 hover:text-white transition-all shadow-md flex items-center gap-1.5 text-xs font-medium cursor-pointer"
-          title="Download single-file index.html"
+          onClick={() => {
+            if (!currentAnalysis) {
+              const defaultCmd = activeBrand.commands.power || Object.values(activeBrand.commands)[0];
+              setCurrentAnalysis(analyzeIrPulse(defaultCmd.hex, activeBrand, defaultCmd.name));
+            }
+            setIsOscilloscopeOpen(true);
+          }}
+          className="p-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] active:scale-95 border border-white/10 text-slate-300 hover:text-white transition-all shadow-md flex items-center gap-1 text-xs font-medium cursor-pointer"
+          title="Buka Oscilloscope Sinyal IR"
         >
-          <Download className="w-3.5 h-3.5 text-emerald-400" />
-          <span className="hidden sm:inline">index.html</span>
+          <Activity className="w-3.5 h-3.5 text-amber-400" />
+          <span className="hidden md:inline">Oskiloskop</span>
         </button>
 
         <button
           onClick={() => setIsAndroidCodeModalOpen(true)}
-          className="p-2 rounded-xl bg-white/5 hover:bg-white/10 active:scale-95 border border-white/10 text-slate-300 hover:text-white transition-all shadow-md flex items-center gap-1.5 text-xs font-medium cursor-pointer"
-          title="Lihat Kode Android Studio (MainActivity.kt & Manifest)"
+          className="p-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] active:scale-95 border border-white/10 text-slate-300 hover:text-white transition-all shadow-md flex items-center gap-1 text-xs font-medium cursor-pointer"
+          title="Lihat Kode Android Studio (MainActivity.kt)"
         >
           <Code2 className="w-3.5 h-3.5 text-sky-400" />
-          <span className="hidden sm:inline">Android Studio</span>
+          <span className="hidden md:inline">Android Studio</span>
+        </button>
+
+        <button
+          onClick={handleDownloadHtml}
+          className="p-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] active:scale-95 border border-white/10 text-slate-300 hover:text-white transition-all shadow-md flex items-center gap-1 text-xs font-medium cursor-pointer"
+          title="Download single-file index.html"
+        >
+          <Download className="w-3.5 h-3.5 text-emerald-400" />
         </button>
       </div>
 
       {/* ============================================================
-          FOCUSED SAMSUNG SMART TV REMOTE (POCO X7 PRO)
+          MAIN CHASSIS CONTAINER (POCO CYBERPUNK / OLED DARK THEME)
           ============================================================ */}
-      <div className="w-full max-w-[390px] h-[100dvh] max-h-[920px] flex flex-col justify-between py-2 relative">
+      <div className="w-full max-w-[420px] flex flex-col justify-start py-1 relative">
         
-        {/* Header Bar: Brand, Hardware Status, IR LED Indicator */}
-        <div className="flex items-center justify-between p-2.5 rounded-2xl bg-white/[0.04] border border-white/10 backdrop-blur-xl mb-2">
-          <div className="flex flex-col">
-            <span className="text-xs font-extrabold tracking-wider text-white uppercase flex items-center gap-1.5">
-              <Tv className="w-3.5 h-3.5 text-sky-400" />
-              SAMSUNG SMART TV
-            </span>
-            <span className="text-[9.5px] text-slate-400 font-medium">
-              Poco X7 Pro · IR Blaster (38 kHz)
-            </span>
+        {/* Top Poco Chassis Notch: Camera, Speaker & IR Blaster LED */}
+        <div className="relative w-full h-8 flex items-center justify-between px-5 py-1 mb-1 rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-xl">
+          
+          {/* Front Camera Notch */}
+          <div className="w-3 h-3 rounded-full bg-zinc-950 border border-zinc-700 flex items-center justify-center">
+            <div className="w-1 h-1 rounded-full bg-sky-950" />
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Sound Toggle */}
-            <button
-              onClick={() => setSoundEnabled(!soundEnabled)}
-              className="p-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer"
-              title={soundEnabled ? 'Suara klik aktif' : 'Suara dimatikan'}
-            >
-              {soundEnabled ? <Volume2 className="w-3.5 h-3.5 text-sky-400" /> : <VolumeX className="w-3.5 h-3.5 text-slate-500" />}
-            </button>
+          {/* Earpiece slit */}
+          <div className="w-12 h-1 bg-zinc-700/60 rounded-full" />
 
-            {/* Hardware IR LED Diode on Poco Chassis */}
+          {/* HARDWARE IR BLASTER LED DIODE */}
+          <div className="flex items-center gap-1.5" title="Hardware IR Blaster Poco / Xiaomi">
+            <span className="text-[9px] font-mono font-bold text-amber-400/90 tracking-wider">
+              POCO IR
+            </span>
             <div
               className={`w-3.5 h-3.5 rounded-full border-2 transition-all duration-150 flex items-center justify-center ${
                 isTransmitting
-                  ? 'bg-rose-500 border-white shadow-[0_0_16px_#f43f5e,0_0_26px_#ec4899] scale-125'
+                  ? 'bg-rose-500 border-white shadow-[0_0_16px_#f43f5e,0_0_28px_#fbbf24] scale-125'
                   : 'bg-zinc-800 border-zinc-600 shadow-inner'
               }`}
-              title="Sensor IR Blaster Poco X7 Pro"
             >
               <div className={`w-1 h-1 rounded-full ${isTransmitting ? 'bg-white' : 'bg-rose-500/30'}`} />
             </div>
+          </div>
+        </div>
 
-            {/* Bridge Status Badge */}
+        {/* Brand & Device Selector Bar */}
+        <div className="flex items-center justify-between p-2.5 rounded-2xl bg-white/[0.04] border border-white/10 backdrop-blur-xl mb-2.5">
+          
+          {/* Clickable Brand Selector Pill */}
+          <button
+            onClick={() => setIsBrandModalOpen(true)}
+            className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-left transition-all active:scale-95 cursor-pointer"
+            title="Klik untuk mengganti merk TV atau Monitor"
+          >
+            <div
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0"
+              style={{
+                backgroundColor: activeBrand.badgeColor ? `${activeBrand.badgeColor}30` : '#334155',
+                color: activeBrand.badgeColor || '#fff',
+                border: `1px solid ${activeBrand.badgeColor ? `${activeBrand.badgeColor}70` : '#475569'}`
+              }}
+            >
+              {activeBrand.category === 'tv' ? <Tv className="w-4 h-4" /> : <Monitor className="w-4 h-4" />}
+            </div>
+
+            <div className="flex flex-col">
+              <span className="text-xs font-black tracking-wide text-white uppercase flex items-center gap-1">
+                {activeBrand.shortName}
+                <span className="text-[10px] text-amber-400">▾</span>
+              </span>
+              <span className="text-[9px] text-slate-400 font-mono">
+                {activeBrand.frequency / 1000} kHz · {activeBrand.protocol.replace('_', ' ')}
+              </span>
+            </div>
+          </button>
+
+          {/* Quick Controls: Sound & Native Bridge Status */}
+          <div className="flex items-center gap-2">
+            {/* Audio Feedback Toggle */}
+            <button
+              onClick={() => {
+                setSoundEnabled(!soundEnabled);
+                showToast(soundEnabled ? 'Suara dimatikan' : 'Suara klik aktif');
+              }}
+              className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer"
+              title={soundEnabled ? 'Suara klik aktif' : 'Suara dimatikan'}
+            >
+              {soundEnabled ? (
+                <Volume2 className="w-4 h-4 text-amber-400" />
+              ) : (
+                <VolumeX className="w-4 h-4 text-slate-500" />
+              )}
+            </button>
+
+            {/* Bridge Status */}
             <button
               onClick={() => {
                 setIsSimulatingBridge(!isSimulatingBridge);
-                showToast(isSimulatingBridge ? 'Mode: Browser Simulasi' : 'Mode: AndroidIR Bridge Aktif');
+                showToast(isSimulatingBridge ? 'Mode Simulasi Browser' : 'Mode Native AndroidIR Bridge');
               }}
-              className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-[9px] font-semibold transition-all cursor-pointer"
-              title="Klik untuk mengubah mode simulasi"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-[9.5px] font-semibold transition-all cursor-pointer"
             >
               <span
-                className={`w-1.5 h-1.5 rounded-full ${
+                className={`w-2 h-2 rounded-full ${
                   isSimulatingBridge
                     ? 'bg-emerald-400 shadow-[0_0_6px_#34d399]'
                     : 'bg-amber-400 shadow-[0_0_6px_#fbbf24]'
                 }`}
               />
               <span className={isSimulatingBridge ? 'text-emerald-300' : 'text-amber-300'}>
-                {isSimulatingBridge ? 'Android IR' : 'Simulasi'}
+                {isSimulatingBridge ? 'ConsumerIR' : 'Simulasi'}
               </span>
             </button>
           </div>
+
         </div>
 
-        {/* Main Glassmorphic Remote Panel */}
-        <div className="flex-1 bg-white/[0.04] backdrop-blur-2xl border border-white/10 rounded-[32px] p-3.5 flex flex-col justify-between shadow-[0_20px_50px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.15)] relative">
-          
-          {/* Row 1: Power, Numpad 123, QWERTY YouTube, Source */}
-          <div className="grid grid-cols-4 gap-2">
-            {/* Power Button (Red Glow) */}
-            <button
-              onClick={() => handleTransmit(SAMSUNG_COMMANDS.power.hex, SAMSUNG_COMMANDS.power.name)}
-              className="h-12 rounded-2xl bg-rose-500/15 hover:bg-rose-500/25 active:bg-rose-500/35 border border-rose-500/40 text-rose-400 flex flex-col items-center justify-center transition-all active:scale-[0.93] active:shadow-[0_0_20px_rgba(244,63,94,0.45)] cursor-pointer"
-            >
-              <Power className="w-4 h-4" />
-              <span className="text-[8.5px] font-bold tracking-wider mt-0.5">POWER</span>
-            </button>
+        {/* Mode Navigation Tabs: Remote / Qwerty / Numpad / Virtual TV */}
+        <div className="grid grid-cols-4 gap-1 p-1 bg-black/40 rounded-2xl border border-white/10 mb-2.5">
+          <button
+            onClick={() => setActiveTab('remote')}
+            className={`py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              activeTab === 'remote'
+                ? 'bg-amber-400 text-black shadow-md shadow-amber-400/20 font-black'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Tv className="w-3.5 h-3.5" />
+            <span>Remote</span>
+          </button>
 
-            {/* 123 Numpad */}
-            <button
-              onClick={() => {
-                setIsQwertyOpen(false);
-                setIsNumpadOpen(true);
-              }}
-              className="h-12 rounded-2xl bg-white/[0.05] hover:bg-white/[0.09] active:bg-white/[0.14] border border-white/10 text-slate-200 flex flex-col items-center justify-center transition-all active:scale-[0.93] cursor-pointer"
-            >
-              <span className="text-xs font-bold tracking-widest text-slate-300">1 2 3</span>
-              <span className="text-[8.5px] font-semibold text-slate-400 mt-0.5">NUMPAD</span>
-            </button>
+          <button
+            onClick={() => setActiveTab('keyboard')}
+            className={`py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              activeTab === 'keyboard'
+                ? 'bg-amber-400 text-black shadow-md shadow-amber-400/20 font-black'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Keyboard className="w-3.5 h-3.5" />
+            <span>QWERTY</span>
+          </button>
 
-            {/* QWERTY Keyboard Button untuk YouTube */}
-            <button
-              onClick={() => {
-                setIsNumpadOpen(false);
-                setIsQwertyOpen(true);
-              }}
-              className="h-12 rounded-2xl bg-red-600/15 hover:bg-red-600/25 active:bg-red-600/35 border border-red-500/40 text-red-400 flex flex-col items-center justify-center transition-all active:scale-[0.93] active:shadow-[0_0_18px_rgba(239,68,68,0.4)] cursor-pointer"
-            >
-              <Keyboard className="w-4 h-4 text-red-400" />
-              <span className="text-[8.5px] font-bold text-red-300 tracking-wider mt-0.5">QWERTY</span>
-            </button>
+          <button
+            onClick={() => setActiveTab('numpad')}
+            className={`py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              activeTab === 'numpad'
+                ? 'bg-amber-400 text-black shadow-md shadow-amber-400/20 font-black'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <span className="font-mono text-[11px]">1 2 3</span>
+            <span>Numpad</span>
+          </button>
 
-            {/* Source */}
-            <button
-              onClick={() => handleTransmit(SAMSUNG_COMMANDS.source.hex, SAMSUNG_COMMANDS.source.name)}
-              className="h-12 rounded-2xl bg-white/[0.05] hover:bg-white/[0.09] active:bg-white/[0.14] border border-white/10 text-slate-200 flex flex-col items-center justify-center transition-all active:scale-[0.93] cursor-pointer"
-            >
-              <Tv className="w-4 h-4 text-amber-400" />
-              <span className="text-[8.5px] font-semibold tracking-wider mt-0.5">SOURCE</span>
-            </button>
-          </div>
+          <button
+            onClick={() => setActiveTab('tv')}
+            className={`py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              activeTab === 'tv'
+                ? 'bg-amber-400 text-black shadow-md shadow-amber-400/20 font-black'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Monitor className="w-3.5 h-3.5" />
+            <span>Layar TV</span>
+          </button>
+        </div>
 
-          {/* YouTube Playback Control Bar (Rewind 10s, Play, Pause, Fast-Forward 10s) */}
-          <div className="grid grid-cols-4 gap-1.5 p-1 bg-black/30 rounded-2xl border border-white/5">
-            <button
-              onClick={() => handleTransmit(SAMSUNG_COMMANDS.rewind.hex, 'Rewind (10s)')}
-              className="h-9 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] active:bg-white/[0.15] border border-white/5 flex items-center justify-center gap-1 text-[10px] text-slate-300 active:text-sky-300 active:scale-95 transition-all cursor-pointer"
-              title="Mundur 10 detik di YouTube"
-            >
-              <RewindIcon className="w-3.5 h-3.5" />
-              <span className="font-mono text-[9px]">-10s</span>
-            </button>
-
-            <button
-              onClick={() => handleTransmit(SAMSUNG_COMMANDS.play.hex, 'Play Video')}
-              className="h-9 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] active:bg-emerald-500/20 border border-white/5 flex items-center justify-center gap-1 text-[10px] text-emerald-400 active:scale-95 transition-all cursor-pointer"
-              title="Putar Video YouTube"
-            >
-              <Play className="w-3.5 h-3.5 fill-current" />
-              <span className="font-semibold text-[9px]">PLAY</span>
-            </button>
-
-            <button
-              onClick={() => handleTransmit(SAMSUNG_COMMANDS.pause.hex, 'Pause Video')}
-              className="h-9 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] active:bg-amber-500/20 border border-white/5 flex items-center justify-center gap-1 text-[10px] text-amber-400 active:scale-95 transition-all cursor-pointer"
-              title="Jeda Video YouTube"
-            >
-              <Pause className="w-3.5 h-3.5 fill-current" />
-              <span className="font-semibold text-[9px]">PAUSE</span>
-            </button>
-
-            <button
-              onClick={() => handleTransmit(SAMSUNG_COMMANDS.fastForward.hex, 'Fast-Forward (10s)')}
-              className="h-9 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] active:bg-white/[0.15] border border-white/5 flex items-center justify-center gap-1 text-[10px] text-slate-300 active:text-sky-300 active:scale-95 transition-all cursor-pointer"
-              title="Maju 10 detik di YouTube"
-            >
-              <span className="font-mono text-[9px]">+10s</span>
-              <FwdIcon className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          {/* Row 2: Circular D-Pad Controller */}
-          <div className="flex items-center justify-center py-1">
-            <div className="relative w-48 h-48 rounded-full bg-white/[0.03] border border-white/10 shadow-[inset_0_2px_10px_rgba(0,0,0,0.6),0_8px_24px_rgba(0,0,0,0.4)] flex items-center justify-center">
-              
-              {/* Up */}
-              <button
-                onClick={() => handleTransmit(SAMSUNG_COMMANDS.up.hex, SAMSUNG_COMMANDS.up.name)}
-                className="absolute top-1 left-1/2 -translate-x-1/2 w-16 h-12 flex items-center justify-center text-slate-300 hover:text-white active:text-sky-300 active:scale-[0.88] transition-all cursor-pointer z-10"
-                aria-label="Up"
-              >
-                <ChevronUp className="w-7 h-7" />
-              </button>
-
-              {/* Left */}
-              <button
-                onClick={() => handleTransmit(SAMSUNG_COMMANDS.left.hex, SAMSUNG_COMMANDS.left.name)}
-                className="absolute left-1 top-1/2 -translate-y-1/2 w-12 h-16 flex items-center justify-center text-slate-300 hover:text-white active:text-sky-300 active:scale-[0.88] transition-all cursor-pointer z-10"
-                aria-label="Left"
-              >
-                <ChevronLeft className="w-7 h-7" />
-              </button>
-
-              {/* OK Center Button (Cyan/Blue Accent Glow) */}
-              <button
-                onClick={() => handleTransmit(SAMSUNG_COMMANDS.ok.hex, SAMSUNG_COMMANDS.ok.name)}
-                className="w-20 h-20 rounded-full bg-gradient-to-br from-sky-500/30 to-blue-600/20 hover:from-sky-500/40 hover:to-blue-600/30 active:from-sky-500/50 active:to-blue-600/40 border border-sky-400/50 text-white font-bold text-sm tracking-wide shadow-lg shadow-sky-500/20 active:scale-[0.92] active:shadow-[0_0_24px_rgba(14,165,233,0.6)] active:border-sky-300 transition-all cursor-pointer z-20 flex items-center justify-center"
-              >
-                <span>OK</span>
-              </button>
-
-              {/* Right */}
-              <button
-                onClick={() => handleTransmit(SAMSUNG_COMMANDS.right.hex, SAMSUNG_COMMANDS.right.name)}
-                className="absolute right-1 top-1/2 -translate-y-1/2 w-12 h-16 flex items-center justify-center text-slate-300 hover:text-white active:text-sky-300 active:scale-[0.88] transition-all cursor-pointer z-10"
-                aria-label="Right"
-              >
-                <ChevronRight className="w-7 h-7" />
-              </button>
-
-              {/* Down */}
-              <button
-                onClick={() => handleTransmit(SAMSUNG_COMMANDS.down.hex, SAMSUNG_COMMANDS.down.name)}
-                className="absolute bottom-1 left-1/2 -translate-x-1/2 w-16 h-12 flex items-center justify-center text-slate-300 hover:text-white active:text-sky-300 active:scale-[0.88] transition-all cursor-pointer z-10"
-                aria-label="Down"
-              >
-                <ChevronDown className="w-7 h-7" />
-              </button>
-            </div>
-          </div>
-
-          {/* Row 3: Navigation Grid (Back, Home, Menu, Exit) */}
-          <div className="grid grid-cols-4 gap-2">
-            <button
-              onClick={() => handleTransmit(SAMSUNG_COMMANDS.back.hex, SAMSUNG_COMMANDS.back.name)}
-              className="h-11 rounded-xl bg-white/[0.05] hover:bg-white/[0.09] active:bg-white/[0.14] border border-white/10 text-slate-300 flex flex-col items-center justify-center transition-all active:scale-[0.93] cursor-pointer"
-            >
-              <RotateCcw className="w-4 h-4 text-slate-300" />
-              <span className="text-[8px] font-bold tracking-wider mt-0.5">BACK</span>
-            </button>
-
-            <button
-              onClick={() => handleTransmit(SAMSUNG_COMMANDS.home.hex, SAMSUNG_COMMANDS.home.name)}
-              className="h-11 rounded-xl bg-sky-500/10 hover:bg-sky-500/20 active:bg-sky-500/30 border border-sky-400/30 text-sky-300 flex flex-col items-center justify-center transition-all active:scale-[0.93] cursor-pointer"
-            >
-              <Home className="w-4 h-4 text-sky-400" />
-              <span className="text-[8px] font-bold tracking-wider mt-0.5">HOME</span>
-            </button>
-
-            <button
-              onClick={() => handleTransmit(SAMSUNG_COMMANDS.menu.hex, SAMSUNG_COMMANDS.menu.name)}
-              className="h-11 rounded-xl bg-white/[0.05] hover:bg-white/[0.09] active:bg-white/[0.14] border border-white/10 text-slate-300 flex flex-col items-center justify-center transition-all active:scale-[0.93] cursor-pointer"
-            >
-              <Menu className="w-4 h-4 text-slate-300" />
-              <span className="text-[8px] font-bold tracking-wider mt-0.5">MENU</span>
-            </button>
-
-            <button
-              onClick={() => handleTransmit(SAMSUNG_COMMANDS.exit.hex, SAMSUNG_COMMANDS.exit.name)}
-              className="h-11 rounded-xl bg-white/[0.05] hover:bg-white/[0.09] active:bg-white/[0.14] border border-white/10 text-slate-300 flex flex-col items-center justify-center transition-all active:scale-[0.93] cursor-pointer"
-            >
-              <X className="w-4 h-4 text-slate-300" />
-              <span className="text-[8px] font-bold tracking-wider mt-0.5">EXIT</span>
-            </button>
-          </div>
-
-          {/* Row 4: Rocker Volume, Mute di Tengah, Channel */}
-          <div className="grid grid-cols-3 gap-2.5 items-center">
+        {/* ============================================================
+            TAB 1: CLASSIC UNIVERSAL REMOTE VIEW
+            ============================================================ */}
+        {activeTab === 'remote' && (
+          <div className="bg-white/[0.04] backdrop-blur-2xl border border-white/10 rounded-[32px] p-4 flex flex-col justify-between shadow-[0_20px_50px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.15)] space-y-4">
             
-            {/* Volume Rocker Pill */}
-            <div className="h-26 rounded-3xl bg-white/[0.04] border border-white/10 flex flex-col items-center justify-between p-1 shadow-inner">
+            {/* Row 1: Power, Qwerty Shortcut, Source/Input, Menu */}
+            <div className="grid grid-cols-4 gap-2">
+              {/* Power Button */}
               <button
-                onClick={() => handleTransmit(SAMSUNG_COMMANDS.volUp.hex, SAMSUNG_COMMANDS.volUp.name)}
-                className="w-full h-9 rounded-2xl bg-white/[0.05] hover:bg-white/[0.1] active:bg-white/[0.2] border border-white/10 text-white font-bold text-base flex items-center justify-center active:scale-[0.92] transition-all cursor-pointer"
-                aria-label="Volume Up"
+                onClick={() => handleTransmit(activeBrand.commands.power.hex, `${activeBrand.shortName} Power`)}
+                className="h-12 rounded-2xl bg-rose-500/15 hover:bg-rose-500/25 active:bg-rose-500/35 border border-rose-500/40 text-rose-400 flex flex-col items-center justify-center transition-all active:scale-90 active:shadow-[0_0_20px_rgba(244,63,94,0.45)] cursor-pointer"
+                title="Power On / Off"
               >
-                +
+                <Power className="w-4 h-4" />
+                <span className="text-[8.5px] font-bold tracking-wider mt-0.5">POWER</span>
               </button>
-              <span className="text-[8.5px] font-bold text-slate-400 tracking-wider">VOL</span>
-              <button
-                onClick={() => handleTransmit(SAMSUNG_COMMANDS.volDown.hex, SAMSUNG_COMMANDS.volDown.name)}
-                className="w-full h-9 rounded-2xl bg-white/[0.05] hover:bg-white/[0.1] active:bg-white/[0.2] border border-white/10 text-white font-bold text-base flex items-center justify-center active:scale-[0.92] transition-all cursor-pointer"
-                aria-label="Volume Down"
-              >
-                −
-              </button>
-            </div>
 
-            {/* Center: Mute Button & Carrier Info */}
-            <div className="flex flex-col items-center justify-center gap-1">
+              {/* Direct QWERTY Switch */}
               <button
-                onClick={() => handleTransmit(SAMSUNG_COMMANDS.mute.hex, SAMSUNG_COMMANDS.mute.name)}
-                className="w-13 h-13 rounded-full bg-white/[0.05] hover:bg-white/[0.1] active:bg-amber-500/20 border border-white/10 active:border-amber-400 text-slate-200 active:text-amber-300 flex flex-col items-center justify-center transition-all active:scale-[0.92] active:shadow-[0_0_16px_rgba(245,158,11,0.4)] cursor-pointer"
+                onClick={() => setActiveTab('keyboard')}
+                className="h-12 rounded-2xl bg-amber-400/15 hover:bg-amber-400/25 active:bg-amber-400/35 border border-amber-400/40 text-amber-300 flex flex-col items-center justify-center transition-all active:scale-90 cursor-pointer"
+                title="Buka Mode Keyboard QWERTY untuk Mengetik"
               >
-                <VolumeX className="w-4 h-4" />
-                <span className="text-[7.5px] font-bold mt-0.5">MUTE</span>
+                <Keyboard className="w-4 h-4 text-amber-400" />
+                <span className="text-[8.5px] font-bold tracking-wider mt-0.5">QWERTY</span>
               </button>
-              <span className="text-[8.5px] font-mono text-slate-500">
-                38 kHz
-              </span>
-            </div>
 
-            {/* Channel Rocker Pill */}
-            <div className="h-26 rounded-3xl bg-white/[0.04] border border-white/10 flex flex-col items-center justify-between p-1 shadow-inner">
+              {/* Source / Input */}
               <button
-                onClick={() => handleTransmit(SAMSUNG_COMMANDS.chUp.hex, SAMSUNG_COMMANDS.chUp.name)}
-                className="w-full h-9 rounded-2xl bg-white/[0.05] hover:bg-white/[0.1] active:bg-white/[0.2] border border-white/10 text-white font-bold text-base flex items-center justify-center active:scale-[0.92] transition-all cursor-pointer"
-                aria-label="Channel Up"
+                onClick={() => handleTransmit(activeBrand.commands.source.hex, `${activeBrand.shortName} Source`)}
+                className="h-12 rounded-2xl bg-white/[0.05] hover:bg-white/[0.1] active:bg-white/[0.15] border border-white/10 text-slate-200 flex flex-col items-center justify-center transition-all active:scale-90 cursor-pointer"
               >
-                ∧
+                <Tv className="w-4 h-4 text-amber-400" />
+                <span className="text-[8.5px] font-semibold tracking-wider mt-0.5">SOURCE</span>
               </button>
-              <span className="text-[8.5px] font-bold text-slate-400 tracking-wider">CH</span>
+
+              {/* Menu / Settings */}
               <button
-                onClick={() => handleTransmit(SAMSUNG_COMMANDS.chDown.hex, SAMSUNG_COMMANDS.chDown.name)}
-                className="w-full h-9 rounded-2xl bg-white/[0.05] hover:bg-white/[0.1] active:bg-white/[0.2] border border-white/10 text-white font-bold text-base flex items-center justify-center active:scale-[0.92] transition-all cursor-pointer"
-                aria-label="Channel Down"
+                onClick={() => handleTransmit(activeBrand.commands.menu.hex, `${activeBrand.shortName} Menu`)}
+                className="h-12 rounded-2xl bg-white/[0.05] hover:bg-white/[0.1] active:bg-white/[0.15] border border-white/10 text-slate-200 flex flex-col items-center justify-center transition-all active:scale-90 cursor-pointer"
               >
-                ∨
+                <Menu className="w-4 h-4 text-slate-300" />
+                <span className="text-[8.5px] font-semibold tracking-wider mt-0.5">MENU</span>
               </button>
             </div>
 
-          </div>
-
-          {/* ============================================================
-               DRAWER: QWERTY KEYBOARD UNTUK YOUTUBE
-               ============================================================ */}
-          <div
-            className={`absolute inset-x-0 bottom-0 bg-[#0c101c]/98 backdrop-blur-3xl border-t border-white/15 rounded-t-[30px] p-4 shadow-2xl transition-transform duration-300 z-50 ${
-              isQwertyOpen ? 'translate-y-0' : 'translate-y-[105%]'
-            }`}
-          >
-            {/* Grab Handle */}
-            <div
-              onClick={() => setIsQwertyOpen(false)}
-              className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-2.5 cursor-pointer"
-            />
-
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-bold text-red-400 tracking-wider uppercase flex items-center gap-1.5">
-                <Search className="w-3.5 h-3.5" />
-                Keyboard Pencarian YouTube TV
-              </span>
+            {/* YouTube & Media Playback Control Bar */}
+            <div className="grid grid-cols-4 gap-1.5 p-1 bg-black/40 rounded-2xl border border-white/5">
               <button
-                onClick={() => setIsQwertyOpen(false)}
-                className="text-xs text-slate-400 hover:text-white"
+                onClick={() => handleTransmit(activeBrand.commands.rewind?.hex || activeBrand.commands.left.hex, 'Rewind (-10s)')}
+                className="h-9 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] active:scale-95 border border-white/5 flex items-center justify-center gap-1 text-[10px] text-slate-300 cursor-pointer"
+                title="Mundur 10 detik"
               >
-                Tutup ✕
+                <RewindIcon className="w-3.5 h-3.5" />
+                <span className="font-mono text-[9px]">-10s</span>
+              </button>
+
+              <button
+                onClick={() => handleTransmit(activeBrand.commands.play?.hex || activeBrand.commands.ok.hex, 'Play')}
+                className="h-9 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] active:scale-95 border border-white/5 flex items-center justify-center gap-1 text-[10px] text-emerald-400 cursor-pointer"
+              >
+                <Play className="w-3.5 h-3.5 fill-current" />
+                <span className="font-semibold text-[9px]">PLAY</span>
+              </button>
+
+              <button
+                onClick={() => handleTransmit(activeBrand.commands.pause?.hex || activeBrand.commands.ok.hex, 'Pause')}
+                className="h-9 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] active:scale-95 border border-white/5 flex items-center justify-center gap-1 text-[10px] text-amber-400 cursor-pointer"
+              >
+                <Pause className="w-3.5 h-3.5 fill-current" />
+                <span className="font-semibold text-[9px]">PAUSE</span>
+              </button>
+
+              <button
+                onClick={() => handleTransmit(activeBrand.commands.fastForward?.hex || activeBrand.commands.right.hex, 'Fast-Forward (+10s)')}
+                className="h-9 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] active:scale-95 border border-white/5 flex items-center justify-center gap-1 text-[10px] text-slate-300 cursor-pointer"
+                title="Maju 10 detik"
+              >
+                <span className="font-mono text-[9px]">+10s</span>
+                <FwdIcon className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            {/* Input Cepat Keyboard HP */}
-            <div className="flex gap-2 mb-2.5">
-              <input
-                type="text"
-                value={ytSearchText}
-                onChange={(e) => setYtSearchText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleTransmit(SAMSUNG_COMMANDS.ok.hex, `Cari: ${ytSearchText}`);
-                    showToast(`🔍 Cari: "${ytSearchText}"`);
-                  }
-                }}
-                placeholder="Ketik judul video di sini..."
-                className="flex-1 h-9 bg-white/[0.07] border border-white/15 rounded-xl px-3 text-xs text-white placeholder-slate-500 outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/50"
-              />
-              <button
-                onClick={() => {
-                  if (ytSearchText.trim()) {
-                    handleTransmit(SAMSUNG_COMMANDS.ok.hex, `Cari: ${ytSearchText}`);
-                    showToast(`🔍 Mencari: "${ytSearchText}" di TV`);
-                  }
-                }}
-                className="px-3.5 h-9 rounded-xl bg-red-600 hover:bg-red-500 active:scale-95 text-white font-bold text-xs flex items-center gap-1 cursor-pointer shadow-md shadow-red-600/30"
-              >
-                <Search className="w-3.5 h-3.5" />
-                <span>CARI</span>
-              </button>
-            </div>
-
-            {/* QWERTY Row 1: Q W E R T Y U I O P */}
-            <div className="flex justify-center gap-1 mb-1.5">
-              {['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'].map(k => (
+            {/* Circular D-Pad Controller */}
+            <div className="flex items-center justify-center py-1">
+              <div className="relative w-52 h-52 rounded-full bg-white/[0.03] border border-white/10 shadow-[inset_0_2px_14px_rgba(0,0,0,0.7),0_10px_30px_rgba(0,0,0,0.5)] flex items-center justify-center">
+                
+                {/* Up */}
                 <button
-                  key={k}
-                  onClick={() => {
-                    setYtSearchText(prev => prev + k);
-                    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(20);
-                  }}
-                  className="h-8.5 min-w-[28px] flex-1 rounded-lg bg-white/[0.08] hover:bg-white/[0.15] active:bg-white/[0.25] border border-white/10 text-white font-bold text-xs active:scale-90 transition-all cursor-pointer"
+                  onClick={() => handleTransmit(activeBrand.commands.up.hex, `${activeBrand.shortName} Up`)}
+                  className="absolute top-1 left-1/2 -translate-x-1/2 w-18 h-14 flex items-center justify-center text-slate-300 hover:text-white active:text-amber-400 active:scale-85 transition-all cursor-pointer z-10"
+                  aria-label="Up"
                 >
-                  {k}
+                  <ChevronUp className="w-8 h-8" />
                 </button>
-              ))}
-            </div>
 
-            {/* QWERTY Row 2: A S D F G H J K L */}
-            <div className="flex justify-center gap-1 mb-1.5 px-2">
-              {['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'].map(k => (
+                {/* Left */}
                 <button
-                  key={k}
-                  onClick={() => {
-                    setYtSearchText(prev => prev + k);
-                    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(20);
-                  }}
-                  className="h-8.5 min-w-[28px] flex-1 rounded-lg bg-white/[0.08] hover:bg-white/[0.15] active:bg-white/[0.25] border border-white/10 text-white font-bold text-xs active:scale-90 transition-all cursor-pointer"
+                  onClick={() => handleTransmit(activeBrand.commands.left.hex, `${activeBrand.shortName} Left`)}
+                  className="absolute left-1 top-1/2 -translate-y-1/2 w-14 h-18 flex items-center justify-center text-slate-300 hover:text-white active:text-amber-400 active:scale-85 transition-all cursor-pointer z-10"
+                  aria-label="Left"
                 >
-                  {k}
+                  <ChevronLeft className="w-8 h-8" />
                 </button>
-              ))}
-            </div>
 
-            {/* QWERTY Row 3: Z X C V B N M + Backspace */}
-            <div className="flex justify-center gap-1 mb-1.5">
-              {['Z', 'X', 'C', 'V', 'B', 'N', 'M'].map(k => (
+                {/* OK Center Button (Poco Yellow Glow) */}
                 <button
-                  key={k}
-                  onClick={() => {
-                    setYtSearchText(prev => prev + k);
-                    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(20);
-                  }}
-                  className="h-8.5 min-w-[28px] flex-1 rounded-lg bg-white/[0.08] hover:bg-white/[0.15] active:bg-white/[0.25] border border-white/10 text-white font-bold text-xs active:scale-90 transition-all cursor-pointer"
+                  onClick={() => handleTransmit(activeBrand.commands.ok.hex, `${activeBrand.shortName} OK`)}
+                  className="w-22 h-22 rounded-full bg-gradient-to-br from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-black font-black text-base tracking-wider shadow-lg shadow-amber-400/30 active:scale-90 active:shadow-[0_0_28px_rgba(251,191,36,0.8)] transition-all cursor-pointer z-20 flex items-center justify-center border border-amber-300"
                 >
-                  {k}
+                  <span>OK</span>
                 </button>
-              ))}
-              <button
-                onClick={() => {
-                  setYtSearchText(prev => prev.slice(0, -1));
-                  if (!ytSearchText) {
-                    handleTransmit(SAMSUNG_COMMANDS.back.hex, 'Back / Hapus');
-                  }
-                  if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(30);
-                }}
-                className="h-8.5 px-3 rounded-lg bg-white/[0.14] hover:bg-white/[0.2] active:bg-white/[0.3] border border-white/15 text-white font-bold text-xs active:scale-90 transition-all cursor-pointer"
-                title="Hapus / Backspace"
-              >
-                ⌫
-              </button>
-            </div>
 
-            {/* QWERTY Row 4: Clear, Space, Enter */}
-            <div className="flex justify-center gap-1 mb-2">
-              <button
-                onClick={() => setYtSearchText('')}
-                className="h-8.5 px-2.5 rounded-lg bg-white/[0.08] hover:bg-white/[0.12] text-[10px] text-slate-400 font-semibold active:scale-95 transition-all cursor-pointer"
-              >
-                Reset
-              </button>
-
-              <button
-                onClick={() => {
-                  setYtSearchText(prev => prev + ' ');
-                  if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(20);
-                }}
-                className="h-8.5 flex-1 max-w-[150px] rounded-lg bg-white/[0.08] hover:bg-white/[0.15] active:bg-white/[0.25] border border-white/10 text-white font-bold text-[11px] tracking-wider active:scale-95 transition-all cursor-pointer"
-              >
-                SPASI
-              </button>
-
-              <button
-                onClick={() => handleTransmit(SAMSUNG_COMMANDS.ok.hex, 'Enter / Search')}
-                className="h-8.5 px-4 rounded-lg bg-sky-500/30 hover:bg-sky-500/40 active:bg-sky-500/50 border border-sky-400/40 text-sky-300 font-bold text-xs active:scale-95 transition-all cursor-pointer"
-              >
-                ENTER ↵
-              </button>
-            </div>
-
-            {/* Preset Cepat YouTube */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[10px]">
-              <span className="text-slate-500 font-medium shrink-0">Preset:</span>
-              {['Musik', 'Podcast', 'Review Poco X7', 'Berita', 'Shorts', 'Lofi Beats'].map(tag => (
+                {/* Right */}
                 <button
-                  key={tag}
-                  onClick={() => {
-                    setYtSearchText(tag);
-                    showToast(`Preset: ${tag}`);
-                  }}
-                  className="px-2.5 py-1 rounded-full bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-slate-300 whitespace-nowrap active:scale-95 transition-all cursor-pointer"
+                  onClick={() => handleTransmit(activeBrand.commands.right.hex, `${activeBrand.shortName} Right`)}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 w-14 h-18 flex items-center justify-center text-slate-300 hover:text-white active:text-amber-400 active:scale-85 transition-all cursor-pointer z-10"
+                  aria-label="Right"
                 >
-                  {tag}
+                  <ChevronRight className="w-8 h-8" />
                 </button>
-              ))}
-            </div>
-          </div>
 
-          {/* ============================================================
-               DRAWER: NUMPAD 123
-               ============================================================ */}
-          <div
-            className={`absolute inset-x-0 bottom-0 bg-[#0c101c]/98 backdrop-blur-3xl border-t border-white/15 rounded-t-[30px] p-4 shadow-2xl transition-transform duration-300 z-50 ${
-              isNumpadOpen ? 'translate-y-0' : 'translate-y-[105%]'
-            }`}
-          >
-            <div
-              onClick={() => setIsNumpadOpen(false)}
-              className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-3 cursor-pointer"
-            />
-
-            <div className="flex items-center justify-between mb-3 px-1">
-              <span className="text-xs font-bold text-slate-300 tracking-wider uppercase">
-                Tombol Angka
-              </span>
-              <button
-                onClick={() => setIsNumpadOpen(false)}
-                className="text-xs text-slate-400 hover:text-white"
-              >
-                ✕ Tutup
-              </button>
+                {/* Down */}
+                <button
+                  onClick={() => handleTransmit(activeBrand.commands.down.hex, `${activeBrand.shortName} Down`)}
+                  className="absolute bottom-1 left-1/2 -translate-x-1/2 w-18 h-14 flex items-center justify-center text-slate-300 hover:text-white active:text-amber-400 active:scale-85 transition-all cursor-pointer z-10"
+                  aria-label="Down"
+                >
+                  <ChevronDown className="w-8 h-8" />
+                </button>
+              </div>
             </div>
 
+            {/* Navigation Grid (Back, Home, Exit) */}
             <div className="grid grid-cols-3 gap-2">
-              <button onClick={() => handleTransmit(SAMSUNG_COMMANDS.num1.hex, '1')} className="h-11 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] active:bg-white/[0.2] border border-white/10 font-bold text-base active:scale-[0.93] transition-all">1</button>
-              <button onClick={() => handleTransmit(SAMSUNG_COMMANDS.num2.hex, '2')} className="h-11 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] active:bg-white/[0.2] border border-white/10 font-bold text-base active:scale-[0.93] transition-all">2</button>
-              <button onClick={() => handleTransmit(SAMSUNG_COMMANDS.num3.hex, '3')} className="h-11 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] active:bg-white/[0.2] border border-white/10 font-bold text-base active:scale-[0.93] transition-all">3</button>
-              <button onClick={() => handleTransmit(SAMSUNG_COMMANDS.num4.hex, '4')} className="h-11 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] active:bg-white/[0.2] border border-white/10 font-bold text-base active:scale-[0.93] transition-all">4</button>
-              <button onClick={() => handleTransmit(SAMSUNG_COMMANDS.num5.hex, '5')} className="h-11 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] active:bg-white/[0.2] border border-white/10 font-bold text-base active:scale-[0.93] transition-all">5</button>
-              <button onClick={() => handleTransmit(SAMSUNG_COMMANDS.num6.hex, '6')} className="h-11 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] active:bg-white/[0.2] border border-white/10 font-bold text-base active:scale-[0.93] transition-all">6</button>
-              <button onClick={() => handleTransmit(SAMSUNG_COMMANDS.num7.hex, '7')} className="h-11 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] active:bg-white/[0.2] border border-white/10 font-bold text-base active:scale-[0.93] transition-all">7</button>
-              <button onClick={() => handleTransmit(SAMSUNG_COMMANDS.num8.hex, '8')} className="h-11 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] active:bg-white/[0.2] border border-white/10 font-bold text-base active:scale-[0.93] transition-all">8</button>
-              <button onClick={() => handleTransmit(SAMSUNG_COMMANDS.num9.hex, '9')} className="h-11 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] active:bg-white/[0.2] border border-white/10 font-bold text-base active:scale-[0.93] transition-all">9</button>
-              <button onClick={() => handleTransmit(SAMSUNG_COMMANDS.source.hex, 'Source')} className="h-11 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] active:bg-white/[0.2] border border-white/10 text-xs font-semibold text-amber-400 active:scale-[0.93] transition-all">SRC</button>
-              <button onClick={() => handleTransmit(SAMSUNG_COMMANDS.num0.hex, '0')} className="h-11 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] active:bg-white/[0.2] border border-white/10 font-bold text-base active:scale-[0.93] transition-all">0</button>
-              <button onClick={() => handleTransmit(SAMSUNG_COMMANDS.back.hex, 'Return')} className="h-11 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] active:bg-white/[0.2] border border-white/10 text-xs font-semibold text-sky-400 active:scale-[0.93] transition-all">RET</button>
+              <button
+                onClick={() => handleTransmit(activeBrand.commands.back.hex, `${activeBrand.shortName} Back`)}
+                className="h-11 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] active:bg-white/[0.15] border border-white/10 text-slate-300 flex flex-col items-center justify-center transition-all active:scale-90 cursor-pointer"
+              >
+                <RotateCcw className="w-4 h-4 text-slate-300" />
+                <span className="text-[8px] font-bold tracking-wider mt-0.5">BACK</span>
+              </button>
+
+              <button
+                onClick={() => handleTransmit(activeBrand.commands.home.hex, `${activeBrand.shortName} Home`)}
+                className="h-11 rounded-xl bg-amber-400/15 hover:bg-amber-400/25 active:bg-amber-400/35 border border-amber-400/40 text-amber-300 flex flex-col items-center justify-center transition-all active:scale-90 cursor-pointer"
+              >
+                <Home className="w-4 h-4 text-amber-400" />
+                <span className="text-[8px] font-bold tracking-wider mt-0.5">HOME</span>
+              </button>
+
+              <button
+                onClick={() => handleTransmit(activeBrand.commands.exit?.hex || activeBrand.commands.back.hex, `${activeBrand.shortName} Exit`)}
+                className="h-11 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] active:bg-white/[0.15] border border-white/10 text-slate-300 flex flex-col items-center justify-center transition-all active:scale-90 cursor-pointer"
+              >
+                <X className="w-4 h-4 text-slate-300" />
+                <span className="text-[8px] font-bold tracking-wider mt-0.5">EXIT</span>
+              </button>
             </div>
+
+            {/* Rocker Volume, Mute di Tengah, Channel */}
+            <div className="grid grid-cols-3 gap-2.5 items-center">
+              
+              {/* Volume Rocker */}
+              <div className="h-28 rounded-3xl bg-white/[0.04] border border-white/10 flex flex-col items-center justify-between p-1 shadow-inner">
+                <button
+                  onClick={() => handleTransmit(activeBrand.commands.volUp.hex, `${activeBrand.shortName} Vol +`)}
+                  className="w-full h-10 rounded-2xl bg-white/[0.06] hover:bg-white/[0.12] active:bg-amber-400 active:text-black border border-white/10 text-white font-bold text-base flex items-center justify-center active:scale-90 transition-all cursor-pointer"
+                >
+                  +
+                </button>
+                <span className="text-[9px] font-bold text-slate-400 tracking-wider">VOL</span>
+                <button
+                  onClick={() => handleTransmit(activeBrand.commands.volDown.hex, `${activeBrand.shortName} Vol -`)}
+                  className="w-full h-10 rounded-2xl bg-white/[0.06] hover:bg-white/[0.12] active:bg-amber-400 active:text-black border border-white/10 text-white font-bold text-base flex items-center justify-center active:scale-90 transition-all cursor-pointer"
+                >
+                  −
+                </button>
+              </div>
+
+              {/* Center: Mute Button */}
+              <div className="flex flex-col items-center justify-center gap-1.5">
+                <button
+                  onClick={() => handleTransmit(activeBrand.commands.mute.hex, `${activeBrand.shortName} Mute`)}
+                  className="w-14 h-14 rounded-full bg-white/[0.06] hover:bg-white/[0.12] active:bg-rose-500/30 border border-white/10 text-slate-200 active:text-rose-400 flex flex-col items-center justify-center transition-all active:scale-90 shadow-md cursor-pointer"
+                  title="Mute Volume"
+                >
+                  <VolumeX className="w-5 h-5 text-rose-400" />
+                  <span className="text-[8px] font-bold mt-0.5">MUTE</span>
+                </button>
+                <span className="text-[8.5px] font-mono text-slate-500">
+                  {activeBrand.frequency / 1000} kHz
+                </span>
+              </div>
+
+              {/* Channel Rocker */}
+              <div className="h-28 rounded-3xl bg-white/[0.04] border border-white/10 flex flex-col items-center justify-between p-1 shadow-inner">
+                <button
+                  onClick={() => handleTransmit(activeBrand.commands.chUp.hex, `${activeBrand.shortName} Ch +`)}
+                  className="w-full h-10 rounded-2xl bg-white/[0.06] hover:bg-white/[0.12] active:bg-amber-400 active:text-black border border-white/10 text-white font-bold text-base flex items-center justify-center active:scale-90 transition-all cursor-pointer"
+                >
+                  ∧
+                </button>
+                <span className="text-[9px] font-bold text-slate-400 tracking-wider">CH</span>
+                <button
+                  onClick={() => handleTransmit(activeBrand.commands.chDown.hex, `${activeBrand.shortName} Ch -`)}
+                  className="w-full h-10 rounded-2xl bg-white/[0.06] hover:bg-white/[0.12] active:bg-amber-400 active:text-black border border-white/10 text-white font-bold text-base flex items-center justify-center active:scale-90 transition-all cursor-pointer"
+                >
+                  ∨
+                </button>
+              </div>
+
+            </div>
+
           </div>
+        )}
 
-        </div>
+        {/* ============================================================
+            TAB 2: REDESIGNED QWERTY KEYBOARD & TV TYPIST SUITE
+            ============================================================ */}
+        {activeTab === 'keyboard' && (
+          <div className="animate-in fade-in duration-150">
+            <QwertyTypingPanel
+              activeBrand={activeBrand}
+              onSendCommand={handleTransmit}
+              onSendRawPattern={(freq, pattern, name) => {
+                const hasBridge = typeof (window as any).AndroidIR?.transmitIR === 'function';
+                if (hasBridge) {
+                  (window as any).AndroidIR.transmitIR(freq, pattern);
+                }
+                showToast(`📡 ${name}`);
+              }}
+              soundEnabled={soundEnabled}
+              onPlaySound={playTactileClick}
+              onShowToast={showToast}
+              onAddLog={addLog}
+              currentTvCursor={{ row: tvState.cursorRow, col: tvState.cursorCol }}
+              onUpdateTvCursor={(row, col) => {
+                setTvState(prev => ({ ...prev, cursorRow: row, cursorCol: col }));
+              }}
+            />
+          </div>
+        )}
 
-        {/* Footer: Log Ticker & Toggle */}
+        {/* ============================================================
+            TAB 3: NUMPAD & COLOR SMART KEYS
+            ============================================================ */}
+        {activeTab === 'numpad' && (
+          <div className="bg-white/[0.04] backdrop-blur-2xl border border-white/10 rounded-[32px] p-4 flex flex-col space-y-3 animate-in fade-in duration-150">
+            <div className="flex items-center justify-between pb-1 px-1">
+              <span className="text-xs font-bold text-white uppercase tracking-wider">
+                Tombol Angka & Fitur Tambahan
+              </span>
+              <span className="text-[10px] text-amber-400 font-mono">
+                {activeBrand.shortName}
+              </span>
+            </div>
+
+            {/* 3x4 Digits Numpad */}
+            <div className="grid grid-cols-3 gap-2">
+              {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(digit => {
+                const cmdKey = `num${digit}`;
+                const cmd = activeBrand.commands[cmdKey];
+                return (
+                  <button
+                    key={digit}
+                    onClick={() => {
+                      if (cmd) handleTransmit(cmd.hex, `Angka ${digit}`);
+                    }}
+                    className="h-12 rounded-2xl bg-white/[0.06] hover:bg-white/[0.12] active:bg-amber-400 active:text-black border border-white/10 font-bold text-lg active:scale-90 transition-all cursor-pointer"
+                  >
+                    {digit}
+                  </button>
+                );
+              })}
+
+              {/* Source Shortcut */}
+              <button
+                onClick={() => handleTransmit(activeBrand.commands.source.hex, 'Source')}
+                className="h-12 rounded-2xl bg-white/[0.06] hover:bg-white/[0.12] active:bg-white/[0.2] border border-white/10 text-xs font-bold text-amber-400 active:scale-90 transition-all cursor-pointer"
+              >
+                SRC
+              </button>
+
+              {/* 0 */}
+              <button
+                onClick={() => {
+                  const cmd0 = activeBrand.commands.num0;
+                  if (cmd0) handleTransmit(cmd0.hex, 'Angka 0');
+                }}
+                className="h-12 rounded-2xl bg-white/[0.06] hover:bg-white/[0.12] active:bg-amber-400 active:text-black border border-white/10 font-bold text-lg active:scale-90 transition-all cursor-pointer"
+              >
+                0
+              </button>
+
+              {/* Return */}
+              <button
+                onClick={() => handleTransmit(activeBrand.commands.back.hex, 'Back')}
+                className="h-12 rounded-2xl bg-white/[0.06] hover:bg-white/[0.12] active:bg-white/[0.2] border border-white/10 text-xs font-bold text-sky-400 active:scale-90 transition-all cursor-pointer"
+              >
+                RET
+              </button>
+            </div>
+
+            {/* Smart Color Buttons (Merah, Hijau, Kuning, Biru) */}
+            <div className="grid grid-cols-4 gap-2 pt-2 border-t border-white/10">
+              <button
+                onClick={() => {
+                  const cmd = activeBrand.commands.red || activeBrand.commands.num1;
+                  handleTransmit(cmd.hex, 'Warna Merah (A)');
+                }}
+                className="h-9 rounded-xl bg-red-500/25 hover:bg-red-500/35 border border-red-500/50 text-red-400 font-bold text-xs active:scale-90 transition-all cursor-pointer flex items-center justify-center"
+              >
+                A
+              </button>
+
+              <button
+                onClick={() => {
+                  const cmd = activeBrand.commands.green || activeBrand.commands.num2;
+                  handleTransmit(cmd.hex, 'Warna Hijau (B)');
+                }}
+                className="h-9 rounded-xl bg-emerald-500/25 hover:bg-emerald-500/35 border border-emerald-500/50 text-emerald-400 font-bold text-xs active:scale-90 transition-all cursor-pointer flex items-center justify-center"
+              >
+                B
+              </button>
+
+              <button
+                onClick={() => {
+                  const cmd = activeBrand.commands.yellow || activeBrand.commands.num3;
+                  handleTransmit(cmd.hex, 'Warna Kuning (C)');
+                }}
+                className="h-9 rounded-xl bg-amber-500/25 hover:bg-amber-500/35 border border-amber-500/50 text-amber-300 font-bold text-xs active:scale-90 transition-all cursor-pointer flex items-center justify-center"
+              >
+                C
+              </button>
+
+              <button
+                onClick={() => {
+                  const cmd = activeBrand.commands.blue || activeBrand.commands.num4;
+                  handleTransmit(cmd.hex, 'Warna Biru (D)');
+                }}
+                className="h-9 rounded-xl bg-blue-500/25 hover:bg-blue-500/35 border border-blue-500/50 text-blue-400 font-bold text-xs active:scale-90 transition-all cursor-pointer flex items-center justify-center"
+              >
+                D
+              </button>
+            </div>
+
+          </div>
+        )}
+
+        {/* ============================================================
+            TAB 4: VIRTUAL TV SIMULATOR
+            ============================================================ */}
+        {activeTab === 'tv' && (
+          <div className="animate-in fade-in duration-150">
+            <VirtualTv state={tvState} brand={activeBrand} />
+          </div>
+        )}
+
+        {/* Footer: Transmission Log Stream & Status Ticker */}
         <div className="pt-2 px-1 flex items-center justify-between text-[10px] text-slate-400">
           <span className="font-mono truncate max-w-[240px]">
-            {lastCommand ? `${lastCommand.name} (${lastCommand.hex})` : 'Siap · Standby'}
+            {lastCommand
+              ? `${lastCommand.name} (${lastCommand.hex}) @ ${lastCommand.freq / 1000}kHz`
+              : `${activeBrand.name} · Siap Transmisi`}
           </span>
           <button
             onClick={() => setIsLogOpen(!isLogOpen)}
-            className="text-sky-400 hover:text-sky-300 underline font-medium cursor-pointer"
+            className="text-amber-400 hover:text-amber-300 underline font-medium cursor-pointer"
           >
             {isLogOpen ? 'Tutup Log' : 'Log IR'}
           </button>
@@ -689,7 +863,7 @@ export default function App() {
 
         {/* Collapsible Log Stream */}
         {isLogOpen && (
-          <div className="mt-1 p-2 rounded-xl bg-black/90 border border-white/10 font-mono text-[9px] text-sky-300 max-h-20 overflow-y-auto leading-relaxed">
+          <div className="mt-1 p-2 rounded-xl bg-black/90 border border-white/10 font-mono text-[9px] text-amber-300 max-h-24 overflow-y-auto leading-relaxed">
             {logs.map((l, i) => (
               <div key={i}>{l}</div>
             ))}
@@ -699,20 +873,54 @@ export default function App() {
       </div>
 
       {/* ============================================================
-          MODAL: KODE ANDROID STUDIO (MAINACTIVITY.KT & MANIFEST)
+          MODALS: BRAND SELECTOR, OSCILLOSCOPE, ANDROID CODE
           ============================================================ */}
+
+      {/* Brand Selector Modal */}
+      {isBrandModalOpen && (
+        <BrandSelectorModal
+          currentBrandId={activeBrandId}
+          onSelectBrand={(id) => {
+            setActiveBrandId(id);
+            const newBrand = BRANDS[id];
+            showToast(`Berganti ke: ${newBrand.name}`);
+            addLog(`[BRAND-SWITCH] Perangkat aktif: ${newBrand.name} (${newBrand.frequency / 1000} kHz, ${newBrand.protocol})`);
+          }}
+          onTestSignal={(brand) => {
+            const muteCmd = brand.commands.mute || brand.commands.power;
+            const { rawPattern, frequency } = generateRawIrPattern(brand, muteCmd);
+            const hasBridge = typeof (window as any).AndroidIR?.transmitIR === 'function';
+            if (hasBridge) {
+              (window as any).AndroidIR.transmitIR(frequency, rawPattern);
+            }
+            showToast(`📡 Tes Sinyal Mute -> ${brand.shortName} (${frequency / 1000} kHz)`);
+            addLog(`[TEST-SIGNAL] ${brand.name} | Mute (${muteCmd.hex}) -> ${frequency / 1000} kHz`);
+          }}
+          onClose={() => setIsBrandModalOpen(false)}
+        />
+      )}
+
+      {/* Oscilloscope Modal */}
+      {isOscilloscopeOpen && (
+        <OscilloscopeModal
+          analysis={currentAnalysis}
+          onClose={() => setIsOscilloscopeOpen(false)}
+        />
+      )}
+
+      {/* Android Studio Code Modal */}
       {isAndroidCodeModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-950 border border-slate-800 rounded-2xl max-w-2xl w-full p-5 shadow-2xl flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-[#0b0f19] border border-slate-800 rounded-3xl max-w-2xl w-full p-5 shadow-2xl flex flex-col max-h-[90vh]">
             
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <div className="flex items-center gap-2">
-                <Code2 className="w-5 h-5 text-sky-400" />
-                <h3 className="text-sm font-bold text-white">Kode Wrapper Android Studio (Poco X7 Pro)</h3>
+                <Code2 className="w-5 h-5 text-amber-400" />
+                <h3 className="text-sm font-bold text-white">Kode Wrapper Android Studio (Poco / Xiaomi IR)</h3>
               </div>
               <button
                 onClick={() => setIsAndroidCodeModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-900 cursor-pointer"
+                className="p-1 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -722,24 +930,24 @@ export default function App() {
             <div className="flex items-center gap-2 my-3">
               <button
                 onClick={() => setActiveCodeTab('html')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
-                  activeCodeTab === 'html' ? 'bg-sky-500 text-white' : 'bg-slate-900 text-slate-400'
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-all ${
+                  activeCodeTab === 'html' ? 'bg-amber-400 text-black font-bold' : 'bg-slate-900 text-slate-400'
                 }`}
               >
                 index.html
               </button>
               <button
                 onClick={() => setActiveCodeTab('kotlin')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
-                  activeCodeTab === 'kotlin' ? 'bg-sky-500 text-white' : 'bg-slate-900 text-slate-400'
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-all ${
+                  activeCodeTab === 'kotlin' ? 'bg-amber-400 text-black font-bold' : 'bg-slate-900 text-slate-400'
                 }`}
               >
                 MainActivity.kt
               </button>
               <button
                 onClick={() => setActiveCodeTab('manifest')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
-                  activeCodeTab === 'manifest' ? 'bg-sky-500 text-white' : 'bg-slate-900 text-slate-400'
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-all ${
+                  activeCodeTab === 'manifest' ? 'bg-amber-400 text-black font-bold' : 'bg-slate-900 text-slate-400'
                 }`}
               >
                 AndroidManifest.xml
@@ -747,7 +955,7 @@ export default function App() {
             </div>
 
             {/* Code Box */}
-            <div className="flex-1 overflow-auto bg-black/70 border border-slate-800 rounded-xl p-3 font-mono text-xs text-slate-300 max-h-[50vh]">
+            <div className="flex-1 overflow-auto bg-black/80 border border-slate-800 rounded-2xl p-3 font-mono text-xs text-slate-300 max-h-[50vh]">
               <pre className="whitespace-pre">
                 <code>
                   {activeCodeTab === 'html' && STANDALONE_HTML_CODE}
@@ -785,12 +993,12 @@ export default function App() {
                       : ANDROID_FILES.androidManifest;
                     handleCopyCode(text, activeCodeTab);
                   }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-400 text-black text-xs font-bold cursor-pointer"
                 >
                   {copiedCodeKey === activeCodeTab ? (
                     <>
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
-                      <span className="text-emerald-400">Tersalin!</span>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Tersalin!</span>
                     </>
                   ) : (
                     <>

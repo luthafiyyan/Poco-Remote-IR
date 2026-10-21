@@ -1,0 +1,43 @@
+{
+  "name": "Poco Universal IR Remote & QWERTY",
+  "short_name": "Poco Remote",
+  "description": "Remote Universal Smart TV & Monitor PC dengan IR Blaster Poco/Xiaomi dan Keyboard QWERTY",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#07090e",
+  "theme_color": "#ffce00",
+  "lang": "id-ID",
+  "categories": ["utilities", "lifestyle"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Keyboard QWERTY",
+      "short_name": "QWERTY",
+      "description": "Buka mode pengetikan cepat untuk YouTube & TV Browser",
+      "url": "/?tab=keyboard",
+      "icons": [{ "src": "/icon.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Remote Klasik",
+      "short_name": "Remote",
+      "description": "Buka remote universal TV & Monitor",
+      "url": "/?tab=remote",
+      "icons": [{ "src": "/icon.svg", "sizes": "192x192" }]
+    }
+  ]
+}

@@ -1,18 +1,44 @@
 <!doctype html>
-<html lang="en">
+<html lang="id">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Poco IR Remote - Samsung Smart TV Hybrid Controller</title>
-    <meta name="description" content="Modern Glassmorphism Web-based Samsung Smart TV remote with NECx2 IR Blaster bridge for Poco X7 Pro and Android WebView." />
-    <meta property="og:title" content="Poco IR Remote - Samsung Smart TV Hybrid Controller" />
-    <meta property="og:description" content="Modern Glassmorphism Web-based Samsung Smart TV remote with NECx2 IR Blaster bridge for Poco X7 Pro and Android WebView." />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Poco Universal IR Remote & QWERTY Typist</title>
+    <meta name="description" content="Aplikasi Remote Universal TV & Monitor PC dengan IR Blaster Poco/Xiaomi serta Keyboard QWERTY untuk YouTube dan TV Browser." />
+    
+    <!-- PWA Web App Manifest -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#ffce00" />
+
+    <!-- Mobile Standalone Meta -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Poco Remote" />
+    
+    <!-- App Icons -->
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Poco Universal IR Remote & QWERTY Typist" />
+    <meta property="og:description" content="Remote Universal Smart TV & Monitor PC dengan IR Blaster Poco/Xiaomi dan Keyboard QWERTY." />
     <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
+    <meta property="og:image" content="/icon.svg" />
   </head>
-  <body>
+  <body class="bg-[#07090e] text-slate-100 select-none">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/sw.js').then(function (reg) {
+            console.log('[PWA] Service Worker terdaftar dengan scope:', reg.scope);
+          }).catch(function (err) {
+            console.warn('[PWA] Service Worker gagal mendaftar:', err);
+          });
+        });
+      }
+    </script>
   </body>
 </html>
-
