@@ -594,7 +594,8 @@
           <option value="polytron">Polytron Cinemax / Google TV</option>
           <option value="tcl">TCL Smart Google TV</option>
           <option value="sharp">Sharp Aquos Android TV</option>
-          <option value="toshiba">Toshiba Smart TV (REGZA)</option>
+          <option value="toshiba">Toshiba TV (REGZA / CT-Series)</option>
+          <option value="toshiba_android">Toshiba Android TV (C350/M550)</option>
           <option value="hisense">Hisense Smart TV (VIDAA)</option>
           <option value="coocaa">Coocaa / Changhong TV</option>
           <option value="panasonic">Panasonic Viera TV</option>
@@ -900,15 +901,27 @@
         }
       },
       toshiba: {
-        name: 'Toshiba Smart TV (REGZA)',
+        name: 'Toshiba TV (REGZA / CT-Series)',
         protocol: 'nec',
         freq: 38000,
         codes: {
-          power: '0x02FD48B7', source: '0x02FDF807', volUp: '0x02FD58A7', volDown: '0x02FD7887', mute: '0x02FD08F7',
-          chUp: '0x02FD18E7', chDown: '0x02FD28D7', up: '0x02FD8877', down: '0x02FD9867', left: '0x02FDA857', right: '0x02FDB847',
-          ok: '0x02FDC837', back: '0x02FDE817', home: '0x02FDD827', menu: '0x02FD6897', exit: '0x02FDE817',
-          num0: '0x02FD00FF', num1: '0x02FD807F', num2: '0x02FD40BF', num3: '0x02FDC03F', num4: '0x02FD20DF',
-          num5: '0x02FDA05F', num6: '0x02FD609F', num7: '0x02FDE01F', num8: '0x02FD10EF', num9: '0x02FD906F'
+          power: '0x40BF12ED', source: '0x40BF14EB', volUp: '0x40BF1AE5', volDown: '0x40BF1EE1', mute: '0x40BF10EF',
+          chUp: '0x40BF1BE4', chDown: '0x40BF1FE0', up: '0x40BF19E6', down: '0x40BF1DE2', left: '0x40BF42BD', right: '0x40BF40BF',
+          ok: '0x40BF21DE', back: '0x40BF649B', home: '0x40BF28D7', menu: '0x40BF5BA4', exit: '0x40BF43BC',
+          num0: '0x40BF00FF', num1: '0x40BF01FE', num2: '0x40BF02FD', num3: '0x40BF03FC', num4: '0x40BF04FB',
+          num5: '0x40BF05FA', num6: '0x40BF06F9', num7: '0x40BF07F8', num8: '0x40BF08F7', num9: '0x40BF09F6'
+        }
+      },
+      toshiba_android: {
+        name: 'Toshiba Android TV (C350 / M550)',
+        protocol: 'nec',
+        freq: 38000,
+        codes: {
+          power: '0xBF4001FE', source: '0xBF400DF2', volUp: '0xBF4002FD', volDown: '0xBF4003FC', mute: '0xBF4004FB',
+          chUp: '0xBF4010EF', chDown: '0xBF4011EE', up: '0xBF4005FA', down: '0xBF4006F9', left: '0xBF4007F8', right: '0xBF4008F7',
+          ok: '0xBF4009F6', back: '0xBF400AF5', home: '0xBF400BF4', menu: '0xBF400CF3', exit: '0xBF400EF1',
+          num0: '0xBF4020DF', num1: '0xBF4017E8', num2: '0xBF4018E7', num3: '0xBF4019E6', num4: '0xBF401AE5',
+          num5: '0xBF401BE4', num6: '0xBF401CE3', num7: '0xBF401DE2', num8: '0xBF401EE1', num9: '0xBF401FE0'
         }
       },
       hisense: {
@@ -1036,15 +1049,19 @@
     let activeBrandKey = 'samsung';
     let soundEnabled = true;
 
-    // Pulse generators
+    // Pulse generators (LSB-first per byte sesuai standar resmi NEC / Renesas)
     function hexToNecRaw(hex, isSamsung) {
       const num = parseInt(hex.replace(/^0x/i, ''), 16);
       const hdrMark = isSamsung ? 4500 : 9000;
       const p = [hdrMark, 4500];
-      for (let i = 31; i >= 0; i--) {
-        const bit = (num >>> i) & 1;
-        p.push(560);
-        p.push(bit === 1 ? 1690 : 560);
+      for (let byteIdx = 0; byteIdx < 4; byteIdx++) {
+        const shift = (3 - byteIdx) * 8;
+        const byteVal = (num >>> shift) & 0xff;
+        for (let bitIdx = 0; bitIdx < 8; bitIdx++) {
+          const bit = (byteVal >>> bitIdx) & 1;
+          p.push(560);
+          p.push(bit === 1 ? 1690 : 560);
+        }
       }
       p.push(560);
       return p.join(',');

@@ -46,7 +46,10 @@ import {
   Monitor,
   Radio,
   Maximize2,
-  Smartphone
+  Smartphone,
+  Info,
+  ShieldAlert,
+  Cpu
 } from 'lucide-react';
 
 export default function App() {
@@ -61,10 +64,13 @@ export default function App() {
   const [isBrandModalOpen, setIsBrandModalOpen] = useState(false);
   const [isOscilloscopeOpen, setIsOscilloscopeOpen] = useState(false);
   const [isAndroidCodeModalOpen, setIsAndroidCodeModalOpen] = useState(false);
+  const [isHardwareInfoOpen, setIsHardwareInfoOpen] = useState(false);
   const [isLogOpen, setIsLogOpen] = useState(false);
 
-  // Hardware feedback
-  const [isSimulatingBridge, setIsSimulatingBridge] = useState(true);
+  // Hardware feedback & Android IR detection
+  const [hasNativeAndroidIR, setHasNativeAndroidIR] = useState<boolean>(() => {
+    return typeof (window as any).AndroidIR?.transmitIR === 'function';
+  });
   const [isTransmitting, setIsTransmitting] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [lastCommand, setLastCommand] = useState<{ name: string; hex: string; freq: number } | null>(null);
@@ -145,15 +151,14 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (isSimulatingBridge) {
-      (window as any).AndroidIR = {
-        hasIrEmitter: () => true,
-        transmitIR: (_freq: number, _pattern: string) => true,
-      };
+    const hasBridge = typeof (window as any).AndroidIR?.transmitIR === 'function';
+    setHasNativeAndroidIR(hasBridge);
+    if (hasBridge) {
+      addLog('[HARDWARE IR] Terhubung ke ConsumerIrManager native Poco/Xiaomi.');
     } else {
-      delete (window as any).AndroidIR;
+      addLog('[MODE WEB] Berjalan di browser/PWA. Lampu IR fisik Poco butuh izin APK Android.');
     }
-  }, [isSimulatingBridge]);
+  }, []);
 
   const showToast = (text: string) => {
     setToastMsg(text);
@@ -202,16 +207,21 @@ export default function App() {
     const hasBridge = typeof (window as any).AndroidIR?.transmitIR === 'function';
     if (hasBridge) {
       try {
-        (window as any).AndroidIR.transmitIR(frequency, rawPattern);
-        showToast(`📡 [${activeBrand.shortName}] ${name}`);
-        addLog(`[IR-OK] ${activeBrand.shortName} | ${name} (${hex}) -> ${frequency / 1000}kHz, ${pulseCount} pulsa.`);
+        const res = (window as any).AndroidIR.transmitIR(frequency, rawPattern);
+        if (res !== false) {
+          showToast(`📡 [IR FISIK] ${activeBrand.shortName}: ${name}`);
+          addLog(`[IR FISIK OK] ${activeBrand.shortName} | ${name} (${hex}) -> ${frequency / 1000}kHz, ${pulseCount} pulsa dipancarkan.`);
+        } else {
+          showToast(`⚠️ Hardware IR gagal transmit`);
+          addLog(`[ERROR] ConsumerIrManager melaporkan gagal kirim.`);
+        }
       } catch (err: any) {
         showToast(`⚠️ Transmit Error: ${err.message}`);
         addLog(`[ERROR] ${err.message}`);
       }
     } else {
-      showToast(`⚡ [SIMULASI ${activeBrand.shortName}] ${name}`);
-      addLog(`[SIMULASI] ${activeBrand.shortName} | ${name} (${hex}) -> ${frequency / 1000}kHz, ${pulseCount} pulsa.`);
+      showToast(`⚡ [Mode Web] ${activeBrand.shortName}: ${name}`);
+      addLog(`[MODE WEB] ${activeBrand.shortName} | ${name} (${hex}) dihitung (${pulseCount} pulsa). Browser tidak bisa menembakkan lampu IR fisik (butuh APK).`);
     }
   };
 
@@ -379,24 +389,26 @@ export default function App() {
             </button>
 
             {/* Bridge Status */}
-            <button
-              onClick={() => {
-                setIsSimulatingBridge(!isSimulatingBridge);
-                showToast(isSimulatingBridge ? 'Mode Simulasi Browser' : 'Mode Native AndroidIR Bridge');
-              }}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-[9.5px] font-semibold transition-all cursor-pointer"
-            >
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  isSimulatingBridge
-                    ? 'bg-emerald-400 shadow-[0_0_6px_#34d399]'
-                    : 'bg-amber-400 shadow-[0_0_6px_#fbbf24]'
-                }`}
-              />
-              <span className={isSimulatingBridge ? 'text-emerald-300' : 'text-amber-300'}>
-                {isSimulatingBridge ? 'ConsumerIR' : 'Simulasi'}
-              </span>
-            </button>
+            {hasNativeAndroidIR ? (
+              <button
+                onClick={() => setIsHardwareInfoOpen(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-[9.5px] font-semibold transition-all cursor-pointer text-emerald-400"
+                title="Hardware IR Blaster Native Aktif"
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399] animate-pulse" />
+                <span>IR Fisik Aktif</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setIsHardwareInfoOpen(true)}
+                className="flex items-center gap-1 px-2 py-1 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-[9.5px] font-semibold transition-all cursor-pointer text-amber-300"
+                title="Klik untuk panduan menyalakan lampu IR fisik Poco"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shadow-[0_0_6px_#fbbf24]" />
+                <span>Web IR</span>
+                <Info className="w-3 h-3 text-amber-400" />
+              </button>
+            )}
           </div>
 
         </div>
@@ -894,6 +906,103 @@ export default function App() {
           analysis={currentAnalysis}
           onClose={() => setIsOscilloscopeOpen(false)}
         />
+      )}
+
+      {/* Hardware Diagnostics & Android IR Info Modal */}
+      {isHardwareInfoOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-[#0b0f19] border border-slate-800 rounded-3xl max-w-lg w-full p-5 shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto">
+            
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <Cpu className="w-5 h-5 text-amber-400" />
+                <h3 className="text-sm font-bold text-white">Status Hardware IR Blaster HP</h3>
+              </div>
+              <button
+                onClick={() => setIsHardwareInfoOpen(false)}
+                className="p-1 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="my-4 space-y-3.5 text-xs">
+              {/* Status Banner */}
+              <div className={`p-3.5 rounded-2xl border ${
+                hasNativeAndroidIR
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                  : 'bg-amber-500/10 border-amber-500/30 text-amber-200'
+              }`}>
+                <div className="flex items-center gap-2 font-bold mb-1">
+                  <span className={`w-2.5 h-2.5 rounded-full ${hasNativeAndroidIR ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]' : 'bg-amber-400 shadow-[0_0_8px_#fbbf24]'}`} />
+                  <span>{hasNativeAndroidIR ? 'Hardware IR Terhubung (APK Native)' : 'Mode Browser Web / PWA (Simulasi)'}</span>
+                </div>
+                <p className="text-[11px] leading-relaxed text-slate-300">
+                  {hasNativeAndroidIR
+                    ? 'Aplikasi berjalan di dalam WebView native dengan izin ConsumerIrManager. Lampu diode IR di ujung atas HP Poco akan memancarkan sinar inframerah fisik ke TV.'
+                    : 'Aplikasi berjalan di web browser (Chrome/Edge/PWA). Karena kebijakan keamanan Android, browser web TIDAK memiliki izin sistem untuk menembakkan lampu IR fisik.'}
+                </p>
+              </div>
+
+              {/* Kenapa Mi Remote Bisa tapi Browser Belum? */}
+              <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-2">
+                <h4 className="font-bold text-white flex items-center gap-1.5">
+                  <ShieldAlert className="w-4 h-4 text-amber-400" />
+                  Kenapa Mi Remote Berhasil, tapi Web Belum?
+                </h4>
+                <p className="text-slate-300 text-[11px] leading-relaxed">
+                  Aplikasi bawaan <strong>Mi Remote</strong> adalah aplikasi <strong>Android Native (.APK)</strong> yang memiliki izin sistem <code className="text-amber-300 bg-black/40 px-1 py-0.5 rounded">android.permission.TRANSMIT_IR</code>.
+                </p>
+                <p className="text-slate-300 text-[11px] leading-relaxed">
+                  Sedangkan Web Browser / PWA dibatasi oleh sistem sandbox Android agar tidak bisa menyalakan lampu hardware tanpa wrapper native APK.
+                </p>
+              </div>
+
+              {/* Cara Tes Lampu IR dengan Kamera */}
+              <div className="p-3.5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-1.5">
+                <h4 className="font-bold text-white flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-sky-400" />
+                  Cara Tes Pancaran Lampu IR Fisik
+                </h4>
+                <p className="text-slate-300 text-[11px] leading-relaxed">
+                  Arahkan lubang sensor hitam di atas HP Poco ke lensa kamera HP lain. Di aplikasi APK / Mi Remote, lampu IR akan memancarkan <strong>kedipan cahaya ungu terang</strong> di layar kamera saat tombol ditekan.
+                </p>
+              </div>
+
+              {/* Solusi Agar HP Memancarkan IR Fisik */}
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/10 to-transparent border border-amber-500/20 space-y-2">
+                <h4 className="font-bold text-white">Cara Menembakkan IR Fisik Menggunakan Remote Ini:</h4>
+                <ol className="list-decimal list-inside text-slate-300 text-[11px] space-y-1 leading-relaxed">
+                  <li>Buka tombol <strong>Kode Android Studio</strong> di bawah.</li>
+                  <li>Kompilasi menjadi APK menggunakan <code className="text-amber-300">MainActivity.kt</code> & <code className="text-amber-300">AndroidManifest.xml</code> yang sudah kami sediakan.</li>
+                  <li>Atau pasang file <code className="text-amber-300">index.html</code> ke dalam wrapper APK Android.</li>
+                </ol>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="pt-3 border-t border-slate-800 flex items-center justify-between">
+              <button
+                onClick={() => {
+                  setIsHardwareInfoOpen(false);
+                  setIsAndroidCodeModalOpen(true);
+                }}
+                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-400 text-black text-xs font-bold cursor-pointer hover:bg-amber-300 transition-colors"
+              >
+                <Code2 className="w-4 h-4" />
+                <span>Buka Kode APK Android</span>
+              </button>
+
+              <button
+                onClick={() => setIsHardwareInfoOpen(false)}
+                className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-semibold cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
+
+          </div>
+        </div>
       )}
 
       {/* Android Studio Code Modal */}

@@ -1,8 +1,10 @@
 import { BrandProfile, IrCommand, IrPulseAnalysis } from '../types/ir';
 
 /**
- * Standard NEC Protocol 32-bit (digunakan oleh LG, Xiaomi, TCL, Polytron, Sharp, Hisense, Coocaa):
+ * Standard NEC Protocol 32-bit (digunakan oleh Toshiba, LG, Xiaomi, TCL, Polytron, Sharp, Hisense, Coocaa, ASUS, HP, Lenovo):
  * - Header Mark: 9000 us, Header Space: 4500 us
+ * - 4 Bytes: [Address, Inverted_Address, Command, Inverted_Command]
+ * - SETIAP BYTE DITRANSMISIKAN LSB FIRST (Bit 0 s/d Bit 7) sesuai spesifikasi resmi NEC / Renesas
  * - Bit Mark: 560 us
  * - Bit '1' Space: 1690 us
  * - Bit '0' Space: 560 us
@@ -25,10 +27,16 @@ export function hexToStandardNecRaw(hexCode: string | number): string {
 
   const pattern: number[] = [HDR_MARK, HDR_SPACE];
 
-  for (let i = 31; i >= 0; i--) {
-    const bit = (numVal >>> i) & 1;
-    pattern.push(BIT_MARK);
-    pattern.push(bit === 1 ? BIT_ONE_SPACE : BIT_ZERO_SPACE);
+  // 4 bytes: [Byte 0 (MSB of 32-bit), Byte 1, Byte 2, Byte 3 (LSB of 32-bit)]
+  // Setiap byte dikirimkan LSB-first (bit 0 lebih dulu) ke IR diode
+  for (let byteIdx = 0; byteIdx < 4; byteIdx++) {
+    const shift = (3 - byteIdx) * 8;
+    const byteVal = (numVal >>> shift) & 0xff;
+    for (let bitIdx = 0; bitIdx < 8; bitIdx++) {
+      const bit = (byteVal >>> bitIdx) & 1;
+      pattern.push(BIT_MARK);
+      pattern.push(bit === 1 ? BIT_ONE_SPACE : BIT_ZERO_SPACE);
+    }
   }
 
   pattern.push(STOP_BIT);
@@ -60,10 +68,14 @@ export function hexToSamsungRaw(hexCode: string | number): string {
 
   const pattern: number[] = [HDR_MARK, HDR_SPACE];
 
-  for (let i = 31; i >= 0; i--) {
-    const bit = (numVal >>> i) & 1;
-    pattern.push(BIT_MARK);
-    pattern.push(bit === 1 ? BIT_ONE_SPACE : BIT_ZERO_SPACE);
+  for (let byteIdx = 0; byteIdx < 4; byteIdx++) {
+    const shift = (3 - byteIdx) * 8;
+    const byteVal = (numVal >>> shift) & 0xff;
+    for (let bitIdx = 0; bitIdx < 8; bitIdx++) {
+      const bit = (byteVal >>> bitIdx) & 1;
+      pattern.push(BIT_MARK);
+      pattern.push(bit === 1 ? BIT_ONE_SPACE : BIT_ZERO_SPACE);
+    }
   }
 
   pattern.push(STOP_BIT);
@@ -75,6 +87,7 @@ export function hexToSamsungRaw(hexCode: string | number): string {
  * - Header Mark: 2400 us, Space: 600 us
  * - Bit '1': Mark 1200 us, Space 600 us
  * - Bit '0': Mark 600 us, Space 600 us
+ * - Ditransmisikan LSB first
  */
 export function hexToSonySircRaw(hexCode: string | number, bits: number = 12): string {
   let numVal: number;
@@ -122,10 +135,8 @@ export function hexToPanasonicRaw(hexCode: string | number): string {
 
   const pattern: number[] = [HDR_MARK, HDR_SPACE];
 
-  // 48 bits = 12 hex chars (6 bytes)
   for (let i = 0; i < 12; i += 2) {
     const byteVal = parseInt(hexStr.substr(i, 2), 16) || 0;
-    // LSB first per byte
     for (let b = 0; b < 8; b++) {
       const bit = (byteVal >>> b) & 1;
       pattern.push(BIT_MARK);
